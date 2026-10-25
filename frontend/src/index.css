@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --carbon: #0e0f11;
+  --ink: #181b1f;
+  --paper: #f5f1eb;
+  --stone: #c6c2bb;
+  --ember: #d74c2d;
+  --muted: #75706f;
+  --line: rgba(255, 255, 255, 0.08);
+  --shadow: rgba(18, 18, 18, 0.16);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-[#0B0C0E] text-stone antialiased;
+  font-family: 'Inter', sans-serif;
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: -0.04em;
+  @apply text-white;
+}
+
+img {
+  @apply block max-w-full;
+}
+
+.bg-grid {
+  background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.card-surface {
+  @apply border border-white/10 bg-[#121416] shadow-soft;
+}
