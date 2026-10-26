@@ -137,6 +137,9 @@ function App() {
           <Route path="/sell" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/listing/:id/edit" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/safety" element={<SafetyPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="*" element={<Navigate to={user ? '/catalog' : '/'} replace />} />
         </Routes>
       </main>
@@ -242,12 +245,80 @@ function Footer() {
           <p className="mt-2 max-w-md text-stone/80">Marketplace premium pour les passionnés de deux-roues, voitures et machines sportives.</p>
         </div>
         <div className="flex gap-6">
-          <span>À propos</span>
-          <span>Conseils anti-arnaque</span>
-          <span>Contact</span>
+          <Link to="/about" className="hover:text-white">À propos</Link>
+          <Link to="/safety" className="hover:text-white">Conseils anti-arnaque</Link>
+          <Link to="/contact" className="hover:text-white">Contact</Link>
         </div>
       </div>
     </footer>
+  );
+}
+
+const CONTACT_PHONE = '0625963977';
+const CONTACT_EMAIL = 'productownerchip@gmail.com';
+
+function InfoPage({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
+  return (
+    <div className="mx-auto max-w-3xl rounded-[28px] border border-white/10 bg-[#121416] p-6 md:p-10">
+      <div className="text-[10px] uppercase tracking-[0.28em] text-ember">{eyebrow}</div>
+      <h1 className="mt-2 font-display text-4xl uppercase text-white md:text-5xl">{title}</h1>
+      <div className="mt-6 space-y-4 leading-relaxed text-stone">{children}</div>
+    </div>
+  );
+}
+
+function AboutPage() {
+  return (
+    <InfoPage eyebrow="SpeedShift" title="À propos">
+      <p>SpeedShift est la marketplace marocaine dédiée aux passionnés de moteur : motos, voitures, jet-skis, quads, pièces et accessoires.</p>
+      <p>Notre objectif est simple : mettre en relation acheteurs et vendeurs de façon rapide, claire et directe. Publiez une annonce en quelques minutes, ajoutez vos photos et laissez les acheteurs vous contacter, notamment sur WhatsApp.</p>
+      <p>Retrouvez les annonces par catégorie, filtrez par prix, année, kilométrage ou carburant, et enregistrez vos coups de cœur dans vos favoris.</p>
+      <Link to="/contact" className="inline-flex rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Nous contacter</Link>
+    </InfoPage>
+  );
+}
+
+function SafetyPage() {
+  const tips = [
+    ['Rencontrez le vendeur', 'Voyez toujours le véhicule ou la pièce en personne, dans un lieu public et en journée.'],
+    ['Ne payez jamais à l’avance', 'Méfiez-vous des demandes d’acompte, de virement ou de “frais de réservation” avant d’avoir vu le bien.'],
+    ['Vérifiez les papiers', 'Contrôlez la carte grise, le numéro de châssis et l’identité du vendeur. Le nom doit correspondre.'],
+    ['Méfiez-vous des prix trop bas', 'Une offre bien en dessous du marché est souvent un piège.'],
+    ['Faites inspecter le véhicule', 'Essayez-le et, si possible, faites-le vérifier par un mécanicien de confiance.'],
+    ['Sécurisez la transaction', 'Privilégiez un paiement le jour de la remise des clés, avec un reçu ou un contrat de vente signé.'],
+    ['Gardez vos données privées', 'Ne communiquez jamais vos codes bancaires ni de codes reçus par SMS.']
+  ];
+  return (
+    <InfoPage eyebrow="Sécurité" title="Conseils anti-arnaque">
+      <ul className="space-y-4">
+        {tips.map(([heading, text]) => (
+          <li key={heading} className="rounded-2xl border border-white/10 bg-[#0d0f10] p-4">
+            <div className="font-semibold text-white">{heading}</div>
+            <p className="mt-1 text-sm">{text}</p>
+          </li>
+        ))}
+      </ul>
+      <p>Une annonce vous semble suspecte ? <Link to="/contact" className="text-ember underline">Signalez-la nous</Link>.</p>
+    </InfoPage>
+  );
+}
+
+function ContactPage() {
+  return (
+    <InfoPage eyebrow="Une question ?" title="Contact">
+      <p>Notre équipe vous répond avec plaisir.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <a href={`tel:${CONTACT_PHONE}`} className="rounded-2xl border border-white/10 bg-[#0d0f10] p-4 transition hover:border-ember/40">
+          <div className="text-xs uppercase tracking-[0.2em] text-stone/70">Téléphone</div>
+          <div className="mt-1 font-semibold text-white">{CONTACT_PHONE}</div>
+        </a>
+        <a href={`mailto:${CONTACT_EMAIL}`} className="rounded-2xl border border-white/10 bg-[#0d0f10] p-4 transition hover:border-ember/40">
+          <div className="text-xs uppercase tracking-[0.2em] text-stone/70">E-mail</div>
+          <div className="mt-1 break-all font-semibold text-white">{CONTACT_EMAIL}</div>
+        </a>
+      </div>
+      <a href={`https://wa.me/212${CONTACT_PHONE.slice(1)}`} target="_blank" rel="noreferrer" className="inline-flex rounded-full bg-[#25D366] px-5 py-3 text-sm font-medium text-white">Écrire sur WhatsApp</a>
+    </InfoPage>
   );
 }
 
@@ -537,14 +608,6 @@ function MarketplacePage() {
   );
 }
 
-const categoryBadgeStyles: Record<string, string> = {
-  Motos: 'bg-red-500',
-  Voitures: 'bg-blue-500',
-  'Jet Skis': 'bg-cyan-500',
-  Quads: 'bg-amber-500',
-  'Pièces & Accessoires': 'bg-violet-500'
-};
-
 function timeAgo(value?: string | null) {
   if (!value) return null;
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
@@ -586,13 +649,8 @@ function ListingCard({ listing }: { listing: any; compact?: boolean }) {
       <Link to={`/listing/${listing.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121416] transition duration-300 hover:-translate-y-1 hover:border-ember/40 hover:shadow-soft">
         <div className="relative overflow-hidden">
           {image ? <img src={thumbUrl(image)} alt={listing.title} loading="lazy" className={`aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-105 ${status === 'sold' ? 'opacity-60 grayscale' : ''}`} /> : <div className="aspect-[4/3] bg-black/20" />}
-          {isPart ? (
-            <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${categoryBadgeStyles[listing.category] ?? 'bg-ember'}`}>{listing.category}</span>
-          ) : (
+          {(!isPart || status === 'sold' || status === 'reserved') && (
             <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${status === 'sold' ? 'bg-neutral-800' : status === 'reserved' ? 'bg-amber-500' : 'bg-emerald-600'}`}>{status === 'sold' ? 'Vendu' : status === 'reserved' ? 'Réservé' : 'Disponible'}</span>
-          )}
-          {isPart && (status === 'sold' || status === 'reserved') && (
-            <span className={`absolute bottom-3 left-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${status === 'sold' ? 'bg-neutral-800' : 'bg-amber-500'}`}>{status === 'sold' ? 'Vendu' : 'Réservé'}</span>
           )}
           <button
             type="button"
