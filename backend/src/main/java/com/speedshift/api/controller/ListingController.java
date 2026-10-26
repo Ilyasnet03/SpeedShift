@@ -44,6 +44,20 @@ public class ListingController {
         return ResponseEntity.ok(listingService.getListings(category, city, query, sort));
     }
 
+    @GetMapping("/listings/mine")
+    public ResponseEntity<List<ListingResponse>> getMyListings(@AuthenticationPrincipal User seller) {
+        return ResponseEntity.ok(listingService.getMyListings(seller));
+    }
+
+    @DeleteMapping("/listings/{id}")
+    public ResponseEntity<Void> deleteOwnListing(
+        @PathVariable Long id,
+        @AuthenticationPrincipal User actor
+    ) {
+        listingService.deleteListing(id, actor);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/listings")
     public ResponseEntity<ListingResponse> createListing(
         @Valid @RequestBody CreateListingRequest request,

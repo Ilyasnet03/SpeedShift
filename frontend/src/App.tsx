@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -10,6 +10,8 @@ import {
   Search,
   ShieldCheck,
   Star,
+  Sun,
+  Moon,
   TrendingUp,
   Users,
   Zap
@@ -17,12 +19,15 @@ import {
 import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   createListing,
+  deleteAdminListing,
+  deleteMyListing,
   getAdminListings,
   getAdminStats,
   getAdminUsers,
   getHome,
   getListing,
   getListings,
+  getMyListings,
   loginUser,
   registerUser,
   setAdminListingStatus,
@@ -36,24 +41,73 @@ import { useAuthStore } from './store/authStore';
 const formatPrice = (value: number | string) =>
   `${new Intl.NumberFormat('fr-MA', { maximumFractionDigits: 0 }).format(Number(value))} DH`;
 
+const getListingImages = (imageValue?: string | null): string[] => {
+  if (!imageValue) return [];
+  try {
+    const parsed: unknown = JSON.parse(imageValue);
+    if (Array.isArray(parsed) && parsed.every((image) => typeof image === 'string')) return parsed;
+  } catch {
+    return [imageValue];
+  }
+  return [imageValue];
+};
+
+const getListingFirstImage = (imageValue?: string | null) => getListingImages(imageValue)[0];
+
+const imageFileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+  const image = new Image();
+  const objectUrl = URL.createObjectURL(file);
+  image.onload = () => {
+    try {
+      const scale = Math.min(1, 1440 / Math.max(image.width, image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(image.width * scale);
+      canvas.height = Math.round(image.height * scale);
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Impossible de traiter cette image.');
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.78));
+    } catch {
+      reject(new Error('Impossible de traiter cette image. Essayez un autre fichier.'));
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
+  image.onerror = () => {
+    URL.revokeObjectURL(objectUrl);
+    reject(new Error('Une des photos ne peut pas être lue.'));
+  };
+  image.src = objectUrl;
+});
+
 const appNavItems = [
-  { label: 'Marketplace', to: '/marketplace' },
+  { label: 'Marché', to: '/marketplace' },
   { label: 'Catalogue', to: '/catalog' },
-  { label: 'Publier une annonce', to: '/sell' }
+  { label: 'Mes annonces', to: '/my-listings' },
+  { label: 'Vendre', to: '/sell' }
 ];
 
 function App() {
   const user = useAuthStore((state) => state.user);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+    localStorage.getItem('speedshift-theme') === 'light' ? 'light' : 'dark'
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('speedshift-theme', theme);
+  }, [theme]);
 
   return (
     <div className="min-h-screen bg-carbon text-stone">
-      <Header />
+      <Header theme={theme} onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />
       <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/marketplace" element={<RequireAuth><MarketplacePage /></RequireAuth>} />
           <Route path="/catalog" element={<RequireAuth><CatalogPage /></RequireAuth>} />
+          <Route path="/my-listings" element={<RequireAuth><MyListingsPage /></RequireAuth>} />
           <Route path="/listing/:id" element={<RequireAuth><ListingDetailPage /></RequireAuth>} />
           <Route path="/sell" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
@@ -77,7 +131,7 @@ function RequireAuth({ children, adminOnly = false }: { children: ReactNode; adm
   return <>{children}</>;
 }
 
-function Header() {
+function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleTheme: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuthStore();
   const navItems = user
@@ -85,7 +139,7 @@ function Header() {
     : [];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/80 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-ember text-lg font-bold text-white">S</div>
@@ -95,12 +149,12 @@ function Header() {
           </div>
         </Link>
 
-        <nav className="hidden items-center gap-7 md:flex">
-          <NavLink to="/" className={({ isActive }) => `text-sm uppercase tracking-[0.18em] transition ${isActive ? 'text-white' : 'text-stone hover:text-white'}`}>
+        <nav aria-label="Navigation principale" className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 md:flex">
+          <NavLink to="/" className={({ isActive }) => `rounded-full px-4 py-2 text-sm transition ${isActive ? 'bg-ember text-white' : 'text-stone hover:text-white'}`}>
             Accueil
           </NavLink>
           {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => `text-sm uppercase tracking-[0.18em] transition ${isActive ? 'text-white' : 'text-stone hover:text-white'}`}>
+            <NavLink key={item.to} to={item.to} className={({ isActive }) => `rounded-full px-4 py-2 text-sm transition ${isActive ? 'bg-ember text-white' : 'text-stone hover:text-white'}`}>
               {item.label}
             </NavLink>
           ))}
@@ -109,36 +163,43 @@ function Header() {
         <div className="hidden items-center gap-3 md:flex">
           {user ? (
             <div className="flex items-center gap-3">
-              <Link to="/marketplace" className="rounded-full border border-ember/60 bg-ember/10 px-4 py-2 text-sm font-medium text-white">Accéder à l’app</Link>
               <span className="text-sm text-white">{user.firstName}</span>
               <button onClick={logout} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white">Déconnexion</button>
             </div>
           ) : (
-            <Link to="/login" className="rounded-full border border-ember/60 bg-ember/10 px-4 py-2 text-sm font-medium text-white">Login</Link>
+            <Link to="/login" className="rounded-full bg-ember px-4 py-2 text-sm font-medium text-white">Connexion</Link>
           )}
+          <button type="button" onClick={onToggleTheme} aria-label={theme === 'dark' ? 'Activer le mode clair' : 'Activer le mode sombre'} title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'} className="rounded-full border border-white/10 bg-white/5 p-2 text-stone transition hover:text-white">
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
         </div>
 
-        <button className="rounded-full border border-white/10 p-2 md:hidden" onClick={() => setMenuOpen(!menuOpen)}>
-          <Menu size={18} />
-        </button>
+        <div className="flex items-center gap-2 md:hidden">
+          <button type="button" onClick={onToggleTheme} aria-label={theme === 'dark' ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-white/10 p-2 text-stone">
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          <button aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'} aria-expanded={menuOpen} className="rounded-full border border-white/10 p-2 text-stone" onClick={() => setMenuOpen(!menuOpen)}>
+            <Menu size={18} />
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
         {menuOpen && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-white/10 bg-carbon md:hidden">
-            <div className="flex max-w-7xl flex-col gap-3 px-4 py-4">
-              <NavLink to="/" className="text-sm uppercase tracking-[0.2em] text-stone" onClick={() => setMenuOpen(false)}>Accueil</NavLink>
+            <nav aria-label="Navigation mobile" className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4">
+              <NavLink to="/" className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => setMenuOpen(false)}>Accueil</NavLink>
               {navItems.map((item) => (
-                <NavLink key={item.to} to={item.to} className="text-sm uppercase tracking-[0.2em] text-stone" onClick={() => setMenuOpen(false)}>
+                <NavLink key={item.to} to={item.to} className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => setMenuOpen(false)}>
                   {item.label}
                 </NavLink>
               ))}
               {user ? (
-                <button onClick={() => { logout(); setMenuOpen(false); }} className="self-start text-sm uppercase tracking-[0.2em] text-stone">Déconnexion</button>
+                <button onClick={() => { logout(); setMenuOpen(false); }} className="self-start rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5">Déconnexion</button>
               ) : (
-                <NavLink to="/login" className="text-sm uppercase tracking-[0.2em] text-stone" onClick={() => setMenuOpen(false)}>Login</NavLink>
+                <NavLink to="/login" className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => setMenuOpen(false)}>Connexion</NavLink>
               )}
-            </div>
+            </nav>
           </motion.div>
         )}
       </AnimatePresence>
@@ -451,10 +512,11 @@ function MarketplacePage() {
 }
 
 function ListingCard({ listing, compact = false }: { listing: any; compact?: boolean }) {
+  const image = getListingFirstImage(listing.imageUrl);
   return (
     <Link to={`/listing/${listing.id}`} className={`group block overflow-hidden rounded-[24px] border border-white/10 bg-[#121416] transition hover:border-ember/40 ${compact ? 'h-full' : ''}`}>
       <div className="relative overflow-hidden">
-        <img src={listing.imageUrl} alt={listing.title} className="h-56 w-full object-cover transition duration-500 group-hover:scale-105" />
+        {image ? <img src={image} alt={listing.title} className="h-56 w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="h-56 bg-black/20" />}
         <div className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/40 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
           <Star size={10} className="fill-current text-yellow-400" />
           {listing.sellerRating ?? '4.8'}
@@ -527,7 +589,7 @@ function CatalogPage() {
             </label>
             <label className="block space-y-2">
               <span>Ville</span>
-              <input value={city} onChange={(event) => setCity(event.target.value)} onBlur={() => setSearchParams((previous) => { const next = new URLSearchParams(previous); city.trim() ? next.set('city', city.trim()) : next.delete('city'); return next; })} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); city.trim() ? next.set('city', city.trim()) : next.delete('city'); return next; }); }} placeholder="Ex. Paris" className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-white placeholder:text-stone/60" />
+              <input value={city} onChange={(event) => setCity(event.target.value)} onBlur={() => setSearchParams((previous) => { const next = new URLSearchParams(previous); city.trim() ? next.set('city', city.trim()) : next.delete('city'); return next; })} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); city.trim() ? next.set('city', city.trim()) : next.delete('city'); return next; }); }} placeholder="Ex. Casablanca" className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-white placeholder:text-stone/60" />
             </label>
           </div>
         </aside>
@@ -557,6 +619,7 @@ function CatalogPage() {
 
 function ListingDetailPage() {
   const { id } = useParams();
+  const [activeImage, setActiveImage] = useState(0);
   const { data, isLoading, isError } = useQuery({ queryKey: ['listing', id], queryFn: () => getListing(Number(id)) });
 
   if (isLoading || !data) {
@@ -564,11 +627,23 @@ function ListingDetailPage() {
     return <LoadingPanel />;
   }
 
+  const images = getListingImages(data.imageUrl);
+  const selectedImage = images[Math.min(activeImage, Math.max(images.length - 1, 0))];
+
   return (
     <div className="space-y-8">
       <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[#121416]">
-        <img src={data.imageUrl} alt={data.title} className="h-[460px] w-full object-cover" />
+        {selectedImage ? <img src={selectedImage} alt={data.title} className="h-[460px] w-full object-cover" /> : <div className="flex h-[460px] items-center justify-center text-stone">Aucune photo disponible</div>}
       </section>
+      {images.length > 1 && (
+        <div className="flex gap-3 overflow-x-auto">
+          {images.map((image, index) => (
+            <button key={image.slice(0, 80) + index} type="button" onClick={() => setActiveImage(index)} aria-label={`Afficher la photo ${index + 1}`} aria-pressed={index === activeImage} className={`shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImage ? 'border-ember' : 'border-white/10'}`}>
+              <img src={image} alt="" className="h-20 w-28 object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
 
       <section className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
         <div className="space-y-6 rounded-[28px] border border-white/10 bg-[#121416] p-6">
@@ -634,6 +709,9 @@ function ListingDetailPage() {
 
 function SellPage() {
   const queryClient = useQueryClient();
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [photoError, setPhotoError] = useState('');
   const [form, setForm] = useState({
     title: '',
     category: 'Motos',
@@ -643,21 +721,55 @@ function SellPage() {
     mileage: '',
     city: '',
     price: '',
-    imageUrl: '',
     description: ''
   });
+  useEffect(() => () => photoPreviews.forEach((preview) => URL.revokeObjectURL(preview)), [photoPreviews]);
+
   const mutation = useMutation({
     mutationFn: (payload: CreateListingPayload) => createListing(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['home'] });
       queryClient.invalidateQueries({ queryKey: ['listings'] });
-      setForm({ title: '', category: 'Motos', brand: '', model: '', year: '', mileage: '', city: '', price: '', imageUrl: '', description: '' });
+      setForm({ title: '', category: 'Motos', brand: '', model: '', year: '', mileage: '', city: '', price: '', description: '' });
+      setPhotos([]);
+      setPhotoPreviews([]);
+      setPhotoError('');
     }
   });
 
   const updateField = (field: keyof typeof form, value: string) => setForm((previous) => ({ ...previous, [field]: value }));
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(event.target.files ?? []);
+    setPhotoError('');
+    if (selected.length > 5) {
+      event.target.value = '';
+      setPhotoError('Vous pouvez ajouter jusqu’à 5 photos.');
+      return;
+    }
+    const invalidFile = selected.find((file) => !file.type.startsWith('image/') || file.size > 12 * 1024 * 1024);
+    if (invalidFile) {
+      event.target.value = '';
+      setPhotoError('Choisissez des images de 12 Mo maximum chacune.');
+      return;
+    }
+    setPhotos(selected);
+    setPhotoPreviews(selected.map((file) => URL.createObjectURL(file)));
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setPhotoError('');
+    let imageUrl: string | undefined;
+    try {
+      const images = await Promise.all(photos.map(imageFileToDataUrl));
+      imageUrl = images.length > 1 ? JSON.stringify(images) : images[0];
+      if (imageUrl && imageUrl.length > 7_500_000) {
+        throw new Error('Les photos sont trop volumineuses. Réduisez leur nombre ou choisissez des fichiers plus petits.');
+      }
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'Impossible de traiter les photos sélectionnées.');
+      return;
+    }
     mutation.mutate({
       title: form.title.trim(),
       category: form.category,
@@ -667,7 +779,7 @@ function SellPage() {
       mileage: form.mileage ? Number(form.mileage) : undefined,
       city: form.city.trim(),
       price: Number(form.price),
-      imageUrl: form.imageUrl.trim() || undefined,
+      imageUrl,
       description: form.description.trim() || undefined
     });
   };
@@ -706,9 +818,17 @@ function SellPage() {
         <label className="space-y-2 text-sm text-stone">Ville
           <input required maxLength={120} value={form.city} onChange={(event) => updateField('city', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
-        <label className="space-y-2 text-sm text-stone md:col-span-2">URL de la photo
-          <input type="url" maxLength={500} value={form.imageUrl} onChange={(event) => updateField('imageUrl', event.target.value)} placeholder="https://…" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" />
+        <label className="space-y-2 text-sm text-stone md:col-span-2">
+          Photos de l’annonce (maximum 5)
+          <input type="file" accept="image/*" multiple onChange={handlePhotoChange} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white file:mr-4 file:rounded-full file:border-0 file:bg-ember file:px-4 file:py-2 file:text-sm file:text-white" />
+          <span className="block text-xs text-stone/70">Sélectionnez des photos dans votre téléphone. Elles seront redimensionnées automatiquement avant l’envoi.</span>
         </label>
+        {photoPreviews.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:col-span-2">
+            {photoPreviews.map((preview, index) => <img key={preview} src={preview} alt={`Aperçu de la photo ${index + 1}`} className="h-32 w-full rounded-xl object-cover" />)}
+          </div>
+        )}
+        {photoError && <p role="alert" className="text-sm text-red-400 md:col-span-2">{photoError}</p>}
         <label className="space-y-2 text-sm text-stone md:col-span-2">Description
           <textarea maxLength={2000} rows={5} value={form.description} onChange={(event) => updateField('description', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
@@ -719,6 +839,65 @@ function SellPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+function MyListingsPage() {
+  const queryClient = useQueryClient();
+  const listingsQuery = useQuery({ queryKey: ['my-listings'], queryFn: getMyListings });
+  const deleteMutation = useMutation({
+    mutationFn: deleteMyListing,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['my-listings'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'listings'] }),
+        queryClient.invalidateQueries({ queryKey: ['home'] }),
+        queryClient.invalidateQueries({ queryKey: ['listings'] })
+      ]);
+    }
+  });
+
+  return (
+    <section className="space-y-6">
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Mon compte</div>
+        <h1 className="mt-2 font-display text-5xl uppercase text-white">Mes annonces</h1>
+        <p className="mt-2 text-stone/75">Consultez le statut de vos annonces ou supprimez celles dont vous n’avez plus besoin.</p>
+      </div>
+      {deleteMutation.isError && <p role="alert" className="text-sm text-red-400">Suppression impossible : {deleteMutation.error.message}</p>}
+      {listingsQuery.isLoading ? <LoadingPanel /> : listingsQuery.isError ? <ErrorPanel error={listingsQuery.error} onRetry={() => listingsQuery.refetch()} /> : !listingsQuery.data ? <ErrorPanel /> : (
+        listingsQuery.data.length === 0 ? (
+          <div className="rounded-[24px] border border-white/10 bg-[#121416] p-10 text-center text-stone">
+            Vous n’avez pas encore publié d’annonce.
+            <Link to="/sell" className="mt-4 inline-flex rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Publier une annonce</Link>
+          </div>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {listingsQuery.data.map((listing) => (
+              <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
+                {getListingFirstImage(listing.imageUrl) && <img src={getListingFirstImage(listing.imageUrl)} alt="" className="h-48 w-full object-cover" />}
+                <div className="space-y-3 p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="font-display text-2xl uppercase text-white">{listing.title}</h2>
+                    <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{listing.status}</span>
+                  </div>
+                  <p className="text-sm text-stone">{listing.brand} {listing.model ?? ''} · {listing.city ?? '—'}</p>
+                  <p className="font-display text-2xl text-ember">{formatPrice(listing.price)}</p>
+                  <button type="button" disabled={deleteMutation.isPending} onClick={() => {
+                    if (window.confirm(`Supprimer définitivement votre annonce « ${listing.title} » ?`)) {
+                      deleteMutation.mutate(listing.id);
+                    }
+                  }} className="w-full rounded-full border border-red-500/40 px-4 py-2 text-sm text-red-400 disabled:opacity-50">
+                    Supprimer mon annonce
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )
+      )}
+    </section>
   );
 }
 
@@ -835,6 +1014,10 @@ function AdminPage() {
     ]);
   };
 
+  const deleteListingMutation = useMutation({
+    mutationFn: deleteAdminListing,
+    onSuccess: refreshAdminData
+  });
   const enabledMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) => setAdminUserEnabled(id, enabled),
     onSuccess: refreshAdminData
@@ -866,10 +1049,10 @@ function AdminPage() {
         <button type="button" className={tabClass('listings')} onClick={() => { setSection('listings'); setSearch(''); }}>Annonces</button>
       </nav>
 
-      {mutationError && <p role="alert" className="text-sm text-red-400">Action impossible. Vérifiez les droits et réessayez.</p>}
+      {(mutationError || deleteListingMutation.isError) && <p role="alert" className="text-sm text-red-400">Action impossible. {deleteListingMutation.error instanceof Error ? deleteListingMutation.error.message : 'Vérifiez les droits et réessayez.'}</p>}
 
       {section === 'stats' && (
-        statsQuery.isLoading ? <LoadingPanel /> : statsQuery.isError || !statsQuery.data ? <ErrorPanel /> : (
+        statsQuery.isLoading ? <LoadingPanel /> : statsQuery.isError || !statsQuery.data ? <ErrorPanel error={statsQuery.error} onRetry={() => statsQuery.refetch()} /> : (
           <section aria-label="Statistiques de la marketplace" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {[
               ['Utilisateurs inscrits', statsQuery.data.totalUsers],
@@ -900,7 +1083,7 @@ function AdminPage() {
             </div>
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher nom, e-mail ou téléphone" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white placeholder:text-stone/50 sm:max-w-sm" />
           </div>
-          {usersQuery.isLoading ? <LoadingPanel /> : usersQuery.isError || !usersQuery.data ? <ErrorPanel /> : (
+          {usersQuery.isLoading ? <LoadingPanel /> : usersQuery.isError || !usersQuery.data ? <ErrorPanel error={usersQuery.error} onRetry={() => usersQuery.refetch()} /> : (
             <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-[#121416]">
               <table className="w-full min-w-[900px] text-left text-sm">
                 <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-stone/60">
@@ -941,31 +1124,41 @@ function AdminPage() {
             </div>
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher une annonce, un vendeur…" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white placeholder:text-stone/50 sm:max-w-sm" />
           </div>
-          {listingsQuery.isLoading ? <LoadingPanel /> : listingsQuery.isError || !listingsQuery.data ? <ErrorPanel /> : (
+          {listingsQuery.isLoading ? <LoadingPanel /> : listingsQuery.isError || !listingsQuery.data ? <ErrorPanel error={listingsQuery.error} onRetry={() => listingsQuery.refetch()} /> : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((listing) => (
-                <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
-                  {listing.imageUrl && <img src={listing.imageUrl} alt="" className="h-48 w-full object-cover" />}
-                  <div className="space-y-3 p-5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs uppercase tracking-[0.2em] text-ember">{listing.category}</span>
-                      <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{listing.status}</span>
+              {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((listing) => {
+                const image = getListingFirstImage(listing.imageUrl);
+                return (
+                  <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
+                    {image && <img src={image} alt="" className="h-48 w-full object-cover" />}
+                    <div className="space-y-3 p-5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs uppercase tracking-[0.2em] text-ember">{listing.category}</span>
+                        <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{listing.status}</span>
+                      </div>
+                      <h3 className="font-display text-2xl uppercase text-white">{listing.title}</h3>
+                      <p className="text-sm text-stone">{listing.brand} {listing.model ?? ''} · {listing.city ?? '—'}</p>
+                      <p className="text-sm text-stone">{formatPrice(listing.price)} · {listing.sellerName ?? 'Vendeur inconnu'}</p>
+                      <p className="line-clamp-3 text-sm text-stone/70">{listing.description ?? 'Aucune description.'}</p>
+                      <label className="block space-y-2 text-xs text-stone/70">Statut de l’annonce
+                        <select value={(listing.status ?? 'pending').toUpperCase()} disabled={listingMutation.isPending} onChange={(event) => listingMutation.mutate({ id: listing.id, status: event.target.value as AdminListingStatus })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white disabled:opacity-50">
+                          <option value="PENDING">En attente</option>
+                          <option value="PUBLISHED">Publiée</option>
+                          <option value="REJECTED">Refusée</option>
+                          <option value="ARCHIVED">Archivée</option>
+                        </select>
+                      </label>
+                      <button type="button" disabled={deleteListingMutation.isPending} onClick={() => {
+                        if (window.confirm(`Supprimer définitivement l’annonce « ${listing.title} » ?`)) {
+                          deleteListingMutation.mutate(listing.id);
+                        }
+                      }} className="w-full rounded-full border border-red-500/40 px-4 py-2 text-sm text-red-400 disabled:opacity-50">
+                        Supprimer l’annonce
+                      </button>
                     </div>
-                    <h3 className="font-display text-2xl uppercase text-white">{listing.title}</h3>
-                    <p className="text-sm text-stone">{listing.brand} {listing.model ?? ''} · {listing.city ?? '—'}</p>
-                    <p className="text-sm text-stone">{formatPrice(listing.price)} · {listing.sellerName ?? 'Vendeur inconnu'}</p>
-                    <p className="line-clamp-3 text-sm text-stone/70">{listing.description ?? 'Aucune description.'}</p>
-                    <label className="block space-y-2 text-xs text-stone/70">Statut de l’annonce
-                      <select value={(listing.status ?? 'pending').toUpperCase()} disabled={listingMutation.isPending} onChange={(event) => listingMutation.mutate({ id: listing.id, status: event.target.value as AdminListingStatus })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white disabled:opacity-50">
-                        <option value="PENDING">En attente</option>
-                        <option value="PUBLISHED">Publiée</option>
-                        <option value="REJECTED">Refusée</option>
-                        <option value="ARCHIVED">Archivée</option>
-                      </select>
-                    </label>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
               {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).length === 0 && <p className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone md:col-span-2 xl:col-span-3">Aucune annonce trouvée.</p>}
             </div>
           )}
@@ -979,10 +1172,22 @@ function LoadingPanel() {
   return <div className="rounded-[24px] border border-white/10 bg-[#121416] p-10 text-center text-stone">Chargement du marché…</div>;
 }
 
-function ErrorPanel() {
+function ErrorPanel({ error, onRetry }: { error?: unknown; onRetry?: () => void }) {
+  const message = error instanceof Error ? error.message : '';
+  const status = Number(message.match(/HTTP (\d+)/)?.[1]);
+  const description = status === 401
+    ? 'Votre session a expiré. Reconnectez-vous.'
+    : status === 403
+      ? 'Votre compte ne dispose pas du rôle administrateur requis. Déconnectez-vous puis reconnectez-vous avec le compte administrateur.'
+      : status === 404
+        ? 'Cette fonction n’est pas encore disponible sur l’API déployée. Déployez le dernier commit sur Render.'
+        : 'Vérifiez votre connexion puis réessayez.';
+
   return (
-    <div role="alert" className="rounded-[24px] border border-red-500/20 bg-[#121416] p-10 text-center text-red-300">
-      Impossible de charger ces données. Vérifiez votre connexion ou <Link to="/login" className="underline">reconnectez-vous</Link>.
+    <div role="alert" className="space-y-4 rounded-[24px] border border-red-500/20 bg-[#121416] p-10 text-center text-red-300">
+      <p>Impossible de charger ces données. {description}</p>
+      {status === 401 && <Link to="/login" className="underline">Se reconnecter</Link>}
+      {onRetry && <button type="button" onClick={onRetry} className="mx-auto block rounded-full border border-white/10 px-4 py-2 text-sm text-white">Réessayer</button>}
     </div>
   );
 }

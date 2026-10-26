@@ -67,4 +67,9 @@ public class AdminController {
     ) {
         return adminService.setListingStatus(id, request.status());
     }
+
+    @DeleteMapping("/listings/{id}")
+    public void deleteListing(@PathVariable Long id) {
+        adminService.deleteListing(id);
+    }
 }

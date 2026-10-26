@@ -9,7 +9,10 @@ import com.speedshift.api.dto.ListingDtos.MarketSummary;
 import com.speedshift.api.entity.Listing;
 import com.speedshift.api.entity.User;
 import com.speedshift.api.repository.ListingRepository;
+import jakarta.transaction.Transactional;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -55,6 +58,22 @@ public class ListingService {
             .toList();
     }
 
+    public List<ListingResponse> getMyListings(User seller) {
+        return listingRepository.findBySellerIdOrderByCreatedAtDesc(seller.getId()).stream()
+            .map(this::toResponse)
+            .toList();
+    }
+
+    @Transactional
+    public void deleteListing(Long id, User actor) {
+        Listing listing = listingRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Annonce introuvable."));
+        if (actor.getRole() != User.Role.ADMIN && !actor.getId().equals(listing.getSellerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Vous ne pouvez supprimer que vos propres annonces.");
+        }
+        listingRepository.delete(listing);
+    }
+
     public ListingResponse createListing(CreateListingRequest request, User seller) {
         LocalDateTime now = LocalDateTime.now();
         Listing listing = Listing.builder()
@@ -70,11 +89,12 @@ public class ListingService {
             .city(request.city().trim())
             .countryCode("MA")
             .imageUrl(request.imageUrl())
-            .thumbnailUrl(request.imageUrl())
+            .thumbnailUrl(null)
             .price(request.price())
             .status("pending")
             .sellerName((seller.getFirstName() + " " + seller.getLastName()).trim())
             .sellerPhone(seller.getPhone())
+            .sellerId(seller.getId())
             .verified(false)
             .sellerRating(BigDecimal.ZERO)
             .views(0)

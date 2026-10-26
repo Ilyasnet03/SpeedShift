@@ -9,7 +9,9 @@ import com.speedshift.api.entity.User.Role;
 import com.speedshift.api.repository.ListingRepository;
 import com.speedshift.api.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -102,6 +104,13 @@ public class AdminService {
             .sorted(Comparator.comparing(Listing::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
             .map(this::toListingSummary)
             .toList();
+    }
+
+    @Transactional
+    public void deleteListing(Long id) {
+        Listing listing = listingRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Annonce introuvable."));
+        listingRepository.delete(listing);
     }
 
     @Transactional

@@ -25,7 +25,7 @@ public class ListingDtos {
         @Size(max = 60) String transmission,
         @NotBlank @Size(max = 120) String city,
         @NotNull @DecimalMin("0.01") BigDecimal price,
-        @Size(max = 500) String imageUrl,
+        @Size(max = 8000000) String imageUrl,
         @Size(max = 2000) String description
     ) {}
 

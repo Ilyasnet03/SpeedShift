@@ -66,11 +66,16 @@ Les services web gratuits Render peuvent se mettre en veille après une période
 - Publication d'annonces avec validation avant affichage sur le marché
 - Fiche annonce détaillée
 - Formulaire de publication
-- Back-office admin avec statistiques, gestion des utilisateurs (rôles et suspension) et modération des annonces
+- Back-office admin avec statistiques, gestion des utilisateurs (rôles et suspension) et modération/suppression des annonces
+- Espace « Mes annonces » avec suppression limitée aux annonces du compte connecté
 - Numéros de téléphone marocains (+212) et prix affichés en dirhams (DH)
+- Thème clair/sombre mémorisé et navigation adaptée au mobile
+- Ajout de jusqu’à 5 photos depuis l’appareil, avec redimensionnement avant envoi
 - API REST avec données de démonstration
 - Dockerisation complète
 
 ## Notes
 
-Les montants sont affichés en DH sans conversion de devise des valeurs déjà enregistrées. La migration Flyway `V3` met à jour les numéros d'exemple français en format marocain ; les villes et autres informations de démonstration ne sont pas converties. L'adresse configurée dans `ADMIN_EMAIL` reçoit le rôle administrateur à sa prochaine connexion.
+Les migrations Flyway `V4` et `V5` localisent les annonces de démonstration au Maroc, convertissent leurs prix en DH selon un taux fixe d’exemple de 1 EUR = 10,8 DH, et relient les annonces à leur propriétaire. Elles ne convertissent pas les prix saisis par les utilisateurs. Les utilisateurs peuvent supprimer uniquement leurs annonces ; un administrateur peut supprimer n’importe quelle annonce. Si les sections admin retournent une erreur 403, reconnectez-vous avec le compte configuré dans `ADMIN_EMAIL` pour renouveler son rôle dans le jeton.
+
+La migration `V4` élargit également le stockage des photos : celles envoyées depuis le téléphone sont redimensionnées et enregistrées avec l’annonce dans PostgreSQL, où elles restent disponibles après redémarrage du service.

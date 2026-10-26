@@ -41,6 +41,7 @@ public class Listing {
     private String city;
     private String countryCode;
     private String conditionField;
+    @Column(columnDefinition = "TEXT")
     private String imageUrl;
     private String thumbnailUrl;
 
@@ -52,6 +53,7 @@ public class Listing {
     private String status;
     private String sellerName;
     private String sellerPhone;
+    private Long sellerId;
     private Boolean verified;
     private BigDecimal sellerRating;
     private Integer views;

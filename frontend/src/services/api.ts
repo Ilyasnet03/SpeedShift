@@ -15,7 +15,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    throw new Error(`Erreur HTTP ${response.status}`);
   }
 
   const text = await response.text();
@@ -49,8 +49,16 @@ export async function getListings(category?: string, city?: string, query?: stri
   return request<any>(`/listings?${params.toString()}`);
 }
 
+export async function getMyListings() {
+  return request<AdminListing[]>('/listings/mine');
+}
+
 export async function getListing(id: number) {
   return request<any>(`/listings/${id}`);
+}
+
+export async function deleteMyListing(id: number) {
+  return request<void>(`/listings/${id}`, { method: 'DELETE' });
 }
 
 export async function getPendingListings() {
@@ -88,6 +96,10 @@ export async function setAdminListingStatus(id: number, status: AdminListingStat
     method: 'PATCH',
     body: JSON.stringify({ status })
   });
+}
+
+export async function deleteAdminListing(id: number) {
+  return request<void>(`/admin/listings/${id}`, { method: 'DELETE' });
 }
 
 export async function publishListing(id: number) {
