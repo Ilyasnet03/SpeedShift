@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: speedshift-api
+    runtime: docker
+    rootDir: backend
+    region: frankfurt
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+
+  - type: web
+    name: speedshift-web
+    runtime: docker
+    rootDir: frontend
+    region: frankfurt
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: BACKEND_INTERNAL_HOSTPORT
+        fromService:
+          type: web
+          name: speedshift-api
+          property: hostport

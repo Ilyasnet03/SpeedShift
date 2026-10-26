@@ -40,6 +40,22 @@ mvn spring-boot:run
 
 Le backend attend PostgreSQL sur `localhost:5432` par défaut. Le profil `test` utilise H2 pour les tests automatisés.
 
+## Déploiement gratuit sur Render
+
+Le fichier `render.yaml` configure le frontend et le backend comme services Docker gratuits. Le frontend transmet `/api` et `/ws` au backend par le réseau privé Render, sans URL d'API codée en dur ni configuration CORS côté navigateur.
+
+Render ne fournit pas de base PostgreSQL gratuite permanente. Pour garder le déploiement gratuit, créez une base PostgreSQL chez un fournisseur avec une offre gratuite, par exemple [Neon](https://neon.tech/), puis :
+
+1. Sur Render, sélectionnez **New + → Blueprint** et connectez le dépôt GitHub `Ilyasnet03/SpeedShift`.
+2. Pendant la synchronisation du Blueprint, renseignez les variables demandées pour l'API :
+   - `SPRING_DATASOURCE_URL` : URL JDBC, par exemple `jdbc:postgresql://<hôte-neon>/<base>?sslmode=require` (utilisez l'hôte et la base indiqués par Neon).
+   - `SPRING_DATASOURCE_USERNAME` : utilisateur PostgreSQL Neon.
+   - `SPRING_DATASOURCE_PASSWORD` : mot de passe PostgreSQL Neon.
+3. Laissez Render générer `JWT_SECRET`, puis créez les services.
+4. Ouvrez l'URL publique du service `speedshift-web` une fois le déploiement terminé.
+
+Les services web gratuits Render peuvent se mettre en veille après une période d'inactivité. Le premier chargement suivant peut donc prendre un moment. Les offres gratuites des fournisseurs de bases de données ont également leurs propres limites et conditions.
+
 ## Fonctionnalités de démonstration incluses
 
 - Page d'accueil premium avec hero et catégories
