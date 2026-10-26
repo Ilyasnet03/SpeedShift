@@ -50,7 +50,8 @@ public class ListingDtos {
         Boolean verified,
         BigDecimal sellerRating,
         Boolean featured,
-        Integer views
+        Integer views,
+        java.time.LocalDateTime createdAt
     ) {}
 
     public record HomeResponse(

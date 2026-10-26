@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CarFront,
+  Clock,
+  Heart,
   ChevronRight,
   Gauge,
   MapPin,
@@ -512,35 +514,77 @@ function MarketplacePage() {
   );
 }
 
-function ListingCard({ listing, compact = false }: { listing: any; compact?: boolean }) {
+const categoryBadgeStyles: Record<string, string> = {
+  Motos: 'bg-red-500',
+  Voitures: 'bg-blue-500',
+  'Jet Skis': 'bg-cyan-500',
+  Quads: 'bg-amber-500',
+  'Pièces & Accessoires': 'bg-violet-500'
+};
+
+function timeAgo(value?: string | null) {
+  if (!value) return null;
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
+  if (Number.isNaN(minutes)) return null;
+  if (minutes < 1) return 'à l’instant';
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours} heure${hours > 1 ? 's' : ''}`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `il y a ${days} jour${days > 1 ? 's' : ''}`;
+  const months = Math.floor(days / 30);
+  return months < 12 ? `il y a ${months} mois` : `il y a ${Math.floor(months / 12)} an${months >= 24 ? 's' : ''}`;
+}
+
+function ListingCard({ listing }: { listing: any; compact?: boolean }) {
+  const [liked, setLiked] = useState(false);
   const image = getListingFirstImage(listing.imageUrl);
+  const heading = listing.title || [listing.brand, listing.model].filter(Boolean).join(' ');
+  const ago = timeAgo(listing.createdAt);
+  const chips = [
+    listing.mileage ? `${listing.mileage.toLocaleString()} km` : null,
+    listing.year ? String(listing.year) : null,
+    listing.fuel,
+    listing.transmission
+  ].filter(Boolean) as string[];
+
   return (
-    <Link to={`/listing/${listing.id}`} className={`group block overflow-hidden rounded-[24px] border border-white/10 bg-[#121416] transition hover:border-ember/40 ${compact ? 'h-full' : ''}`}>
-      <div className="relative overflow-hidden">
-        {image ? <img src={image} alt={listing.title} className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="aspect-square bg-black/20" />}
-        <div className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/40 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
-          <Star size={10} className="fill-current text-yellow-400" />
-          {listing.sellerRating ?? '4.8'}
+    <motion.div
+      initial={{ opacity: 0, y: 32 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.15 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+      className="h-full"
+    >
+      <Link to={`/listing/${listing.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121416] transition duration-300 hover:-translate-y-1 hover:border-ember/40 hover:shadow-soft">
+        <div className="relative overflow-hidden">
+          {image ? <img src={image} alt={listing.title} loading="lazy" className="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="aspect-[4/3] bg-black/20" />}
+          <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${categoryBadgeStyles[listing.category] ?? 'bg-ember'}`}>{listing.category}</span>
+          <button
+            type="button"
+            aria-label={liked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+            aria-pressed={liked}
+            onClick={(event) => { event.preventDefault(); event.stopPropagation(); setLiked((value) => !value); }}
+            className="absolute right-3 top-3 rounded-full bg-black/30 p-2 text-white backdrop-blur transition hover:bg-black/50"
+          >
+            <Heart size={18} className={liked ? 'fill-red-500 text-red-500' : ''} />
+          </button>
         </div>
-      </div>
-      <div className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-display text-3xl uppercase text-white">{formatPrice(listing.price)}</div>
-            <h3 className="mt-1 text-xl uppercase text-stone">{listing.title}</h3>
+        <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
+          <h3 className="line-clamp-1 text-base font-semibold text-white sm:text-lg">{heading}</h3>
+          <div className="text-xl font-bold text-white sm:text-2xl">{formatPrice(listing.price)}</div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone/80 sm:text-sm">
+            {listing.city && <span className="inline-flex items-center gap-1"><MapPin size={14} />{listing.city}</span>}
+            {ago && <span className="inline-flex items-center gap-1"><Clock size={14} />{ago}</span>}
           </div>
-          {listing.year ? <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-stone">{listing.year}</span> : null}
+          {chips.length > 0 && (
+            <div className="mt-auto flex flex-wrap gap-2 pt-1">
+              {chips.map((chip) => <span key={chip} className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-stone">{chip}</span>)}
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-2 text-sm text-stone/80">
-          <MapPin size={14} />
-          {listing.city}
-        </div>
-        <div className="flex items-center justify-between border-t border-white/10 pt-3 text-xs uppercase tracking-[0.2em] text-stone/70">
-          <span>{listing.brand}</span>
-          {listing.mileage ? <span>{`${listing.mileage.toLocaleString()} km`}</span> : null}
-        </div>
-      </div>
-    </Link>
+      </Link>
+    </motion.div>
   );
 }
 

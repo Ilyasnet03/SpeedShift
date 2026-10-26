@@ -219,7 +219,8 @@ public class ListingService {
             listing.getVerified(),
             listing.getSellerRating(),
             listing.getFeatured(),
-            listing.getViews()
+            listing.getViews(),
+            listing.getCreatedAt()
         );
     }
 
