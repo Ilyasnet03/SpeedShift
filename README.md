@@ -42,7 +42,7 @@ Le backend attend PostgreSQL sur `localhost:5432` par défaut. Le profil `test` 
 
 ## Déploiement gratuit sur Render
 
-Le fichier `render.yaml` configure le frontend et le backend comme services Docker gratuits. Le frontend transmet `/api` et `/ws` au backend par le réseau privé Render, sans URL d'API codée en dur ni configuration CORS côté navigateur.
+Le fichier `render.yaml` configure le frontend comme site statique gratuit et l'API comme service web Docker gratuit. Le frontend appelle l'API publique ; le backend n'autorise que l'origine du frontend configurée.
 
 Render ne fournit pas de base PostgreSQL gratuite permanente. Pour garder le déploiement gratuit, créez une base PostgreSQL chez un fournisseur avec une offre gratuite, par exemple [Neon](https://neon.tech/), puis :
 
@@ -52,9 +52,9 @@ Render ne fournit pas de base PostgreSQL gratuite permanente. Pour garder le dé
    - `SPRING_DATASOURCE_USERNAME` : utilisateur PostgreSQL Neon.
    - `SPRING_DATASOURCE_PASSWORD` : mot de passe PostgreSQL Neon.
 3. Laissez Render générer `JWT_SECRET`, puis créez les services.
-4. Ouvrez l'URL publique du service `speedshift-web` une fois le déploiement terminé.
+4. Ouvrez le site statique `speedshift-web` une fois les deux déploiements terminés.
 
-Les services web gratuits Render peuvent se mettre en veille après une période d'inactivité. Le premier chargement suivant peut donc prendre un moment. Les offres gratuites des fournisseurs de bases de données ont également leurs propres limites et conditions.
+Les services gratuits Render peuvent se mettre en veille après une période d'inactivité. Le premier appel à l'API peut donc prendre un moment. Les offres gratuites des fournisseurs de bases de données ont également leurs propres limites et conditions. Si Render attribue des sous-domaines différents, mettez à jour `VITE_API_BASE_URL` et `FRONTEND_URL` dans `render.yaml` avec les URL affichées dans le tableau de bord, puis redéployez.
 
 ## Fonctionnalités de démonstration incluses
 

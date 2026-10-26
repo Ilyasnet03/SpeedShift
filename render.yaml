@@ -15,17 +15,20 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: FRONTEND_URL
+        value: https://speedshift-web.onrender.com
 
   - type: web
     name: speedshift-web
-    runtime: docker
+    runtime: static
     rootDir: frontend
     region: frankfurt
-    plan: free
-    healthCheckPath: /
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
-      - key: BACKEND_INTERNAL_HOSTPORT
-        fromService:
-          type: web
-          name: speedshift-api
-          property: hostport
+      - key: VITE_API_BASE_URL
+        value: https://speedshift-api.onrender.com/api

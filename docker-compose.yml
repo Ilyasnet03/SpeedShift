@@ -33,6 +33,7 @@ services:
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/speedshift}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-speedshift}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-speedshift}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     ports:
