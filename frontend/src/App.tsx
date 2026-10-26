@@ -173,10 +173,10 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-3">
-          <img src={logoSpeedshift} alt="SpeedShift" className="h-10 w-10 rounded-full object-cover" />
+        <Link to="/" className="flex items-center gap-2 sm:gap-3">
+          <img src={logoSpeedshift} alt="SpeedShift" className="h-9 w-9 rounded-full object-cover sm:h-10 sm:w-10" />
           <div>
-            <div className="font-display text-3xl uppercase leading-none text-white">SpeedShift</div>
+            <div className="font-display text-2xl uppercase leading-none text-white sm:text-3xl">SpeedShift</div>
             <div className="text-[10px] uppercase tracking-[0.32em] text-stone">Marketplace</div>
           </div>
         </Link>
@@ -247,7 +247,7 @@ function Footer() {
           <div className="font-display text-3xl uppercase text-white">SpeedShift</div>
           <p className="mt-2 max-w-md text-stone/80">Marketplace premium pour les passionnés de deux-roues, voitures et machines sportives.</p>
         </div>
-        <div className="flex gap-6">
+        <div className="flex flex-wrap gap-x-6 gap-y-3">
           <Link to="/about" className="hover:text-white">À propos</Link>
           <Link to="/safety" className="hover:text-white">Conseils anti-arnaque</Link>
           <Link to="/contact" className="hover:text-white">Contact</Link>
@@ -365,7 +365,7 @@ function LandingPage() {
             </div>
 
             <div className="max-w-2xl space-y-5">
-              <h1 className="font-display text-6xl uppercase leading-[0.9] text-white md:text-7xl">
+              <h1 className="font-display text-5xl uppercase leading-[0.9] text-white sm:text-6xl md:text-7xl">
                 Acheter et vendre les machines <span className="text-ember">qui font battre le cœur.</span>
               </h1>
               <p className="max-w-xl text-base text-stone/80 md:text-lg">
@@ -437,7 +437,7 @@ function LandingPage() {
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-[30px] border border-white/10 bg-[#121416] p-6 md:p-8">
           <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Le salon de la mécanique</div>
-          <h2 className="mt-3 max-w-md font-display text-5xl uppercase text-white">Une plateforme pensée comme un lieu de rencontre, pas juste un tableau.</h2>
+          <h2 className="mt-3 max-w-md font-display text-4xl uppercase text-white sm:text-5xl">Une plateforme pensée comme un lieu de rencontre, pas juste un tableau.</h2>
           <p className="mt-4 max-w-xl text-stone/75">
             Entre acheteurs exigeants et vendeurs sérieux, SpeedShift crée un espace premium où l’information est claire, la transaction sécurisée et la passion du moteur toujours au centre.
           </p>
@@ -478,7 +478,7 @@ function LandingPage() {
         <div className="mb-6 flex items-end justify-between">
           <div>
             <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Catégories</div>
-            <h2 className="mt-2 text-4xl uppercase text-white">La bonne machine dans la bonne catégorie</h2>
+            <h2 className="mt-2 text-3xl uppercase text-white sm:text-4xl">La bonne machine dans la bonne catégorie</h2>
           </div>
         </div>
         <div className="grid gap-4 lg:grid-cols-4">
@@ -524,7 +524,7 @@ function MarketplacePage() {
               Marché premium 100% moteur
             </div>
             <div className="max-w-2xl space-y-5">
-              <h1 className="font-display text-6xl uppercase leading-[0.9] text-white md:text-7xl">
+              <h1 className="font-display text-5xl uppercase leading-[0.9] text-white sm:text-6xl md:text-7xl">
                 Trouvez la machine <span className="text-ember">qui vous ressemble.</span>
               </h1>
               <p className="max-w-lg text-base text-stone/80 md:text-lg">
@@ -557,10 +557,10 @@ function MarketplacePage() {
       </section>
 
       <section>
-        <div className="mb-6 flex items-end justify-between">
+        <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Catégories</div>
-            <h2 className="mt-2 text-4xl uppercase text-white">Explorer la grille</h2>
+            <h2 className="mt-2 text-3xl uppercase text-white sm:text-4xl">Explorer la grille</h2>
           </div>
           <Link to="/catalog" className="inline-flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-stone hover:text-white">Découvrir <ChevronRight size={15} /></Link>
         </div>
@@ -601,7 +601,7 @@ function MarketplacePage() {
             <h2 className="mt-2 text-4xl uppercase text-white">Dernières annonces</h2>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:gap-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
           {data.latest.map((item: any) => (
             <ListingCard key={item.id} listing={item} compact />
           ))}
@@ -811,7 +811,7 @@ function CatalogPage() {
               <option value="popular">Populaires</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:gap-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
             {filtered.map((item: any) => (
               <ListingCard key={item.id} listing={item} compact />
             ))}
@@ -853,15 +853,15 @@ function ListingDetailPage() {
 
       <section className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
         <div className="space-y-6 rounded-[28px] border border-white/10 bg-[#121416] p-6">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-[10px] uppercase tracking-[0.26em] text-ember">{data.category}</div>
-              <h1 className="mt-2 text-5xl uppercase text-white">{data.title}</h1>
+              <h1 className="mt-2 break-words text-3xl uppercase text-white sm:text-5xl">{data.title}</h1>
             </div>
             <div className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-stone">{statusLabels[String(data.status).toLowerCase()] ?? data.status}</div>
           </div>
 
-          <div className="flex items-center gap-6 text-sm text-stone/80">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-stone/80">
             <span className="flex items-center gap-2"><MapPin size={16} /> {data.city}</span>
             {data.year ? <span>{data.year}</span> : null}
             {data.mileage != null ? <span>{`${data.mileage.toLocaleString()} km`}</span> : null}
@@ -1060,7 +1060,7 @@ function SellPage() {
     <div className="max-w-4xl rounded-[28px] border border-white/10 bg-[#121416] p-6 md:p-10">
       <div className="mb-8">
         <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Vendre</div>
-        <h1 className="mt-2 font-display text-5xl uppercase text-white">{editingId !== null ? 'Modifier mon annonce' : 'Publier une annonce'}</h1>
+        <h1 className="mt-2 font-display text-4xl uppercase text-white sm:text-5xl">{editingId !== null ? 'Modifier mon annonce' : 'Publier une annonce'}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
@@ -1167,7 +1167,7 @@ function MyListingsPage() {
     <section className="space-y-6">
       <div>
         <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Mon compte</div>
-        <h1 className="mt-2 font-display text-5xl uppercase text-white">Mes annonces</h1>
+        <h1 className="mt-2 font-display text-4xl uppercase text-white sm:text-5xl">Mes annonces</h1>
         <p className="mt-2 text-stone/75">Consultez le statut de vos annonces ou supprimez celles dont vous n’avez plus besoin.</p>
       </div>
       {deleteMutation.isError && <p role="alert" className="text-sm text-red-400">Suppression impossible : {deleteMutation.error.message}</p>}
@@ -1230,7 +1230,7 @@ function FavoritesPage() {
     <section className="space-y-6">
       <div>
         <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Mon compte</div>
-        <h1 className="mt-2 font-display text-5xl uppercase text-white">Mes favoris</h1>
+        <h1 className="mt-2 font-display text-4xl uppercase text-white sm:text-5xl">Mes favoris</h1>
       </div>
       {favorites.length === 0 ? (
         <div className="rounded-[24px] border border-white/10 bg-[#121416] p-10 text-center text-stone">
@@ -1238,7 +1238,7 @@ function FavoritesPage() {
           <Link to="/catalog" className="mt-4 inline-flex rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Parcourir le catalogue</Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:gap-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
           {favorites.map((item: any) => <ListingCard key={item.id} listing={item} />)}
         </div>
       )}
@@ -1340,7 +1340,7 @@ function LoginPage() {
 
   if (pendingEmail) {
     return (
-      <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-8">
+      <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-6 sm:p-8">
         <h1 className="font-display text-3xl uppercase text-white">Vérifiez votre e-mail</h1>
         <p className="mt-3 text-sm text-stone">Saisissez le code à 6 chiffres envoyé à <strong className="text-white">{pendingEmail}</strong>. Il est valable 15 minutes.</p>
         <form onSubmit={handleVerify} className="mt-6 space-y-4">
@@ -1358,7 +1358,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-8">
+    <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-6 sm:p-8">
       <div className="flex gap-2 rounded-full border border-white/10 bg-[#0d0f10] p-1">
         <button onClick={() => setMode('login')} className={`flex-1 rounded-full px-4 py-2 text-sm ${mode === 'login' ? 'bg-ember text-white' : 'text-stone'}`}>
           Connexion
@@ -1453,7 +1453,7 @@ function AdminPage() {
     <div className="space-y-8">
       <div>
         <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Espace sécurisé</div>
-        <h1 className="mt-2 font-display text-5xl uppercase text-white">Dashboard admin</h1>
+        <h1 className="mt-2 font-display text-4xl uppercase text-white sm:text-5xl">Dashboard admin</h1>
         <p className="mt-3 text-stone/75">Statistiques, comptes et annonces de la marketplace.</p>
       </div>
 
