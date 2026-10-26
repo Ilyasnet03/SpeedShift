@@ -106,7 +106,6 @@ const dataUrlToBlob = async (dataUrl: string) => (await fetch(dataUrl)).blob();
 
 const appNavItems = [
   { label: 'Favoris', to: '/favorites' },
-  { label: 'Marché', to: '/marketplace' },
   { label: 'Catalogue', to: '/catalog' },
   { label: 'Mes annonces', to: '/my-listings' },
   { label: 'Vendre', to: '/sell' }
@@ -130,7 +129,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/marketplace" element={<RequireAuth><MarketplacePage /></RequireAuth>} />
+          <Route path="/marketplace" element={<Navigate to="/catalog" replace />} />
           <Route path="/catalog" element={<RequireAuth><CatalogPage /></RequireAuth>} />
           <Route path="/favorites" element={<RequireAuth><FavoritesPage /></RequireAuth>} />
           <Route path="/my-listings" element={<RequireAuth><MyListingsPage /></RequireAuth>} />
@@ -138,7 +137,7 @@ function App() {
           <Route path="/sell" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/listing/:id/edit" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
-          <Route path="*" element={<Navigate to={user ? '/marketplace' : '/'} replace />} />
+          <Route path="*" element={<Navigate to={user ? '/catalog' : '/'} replace />} />
         </Routes>
       </main>
       <Footer />
@@ -153,7 +152,7 @@ function RequireAuth({ children, adminOnly = false }: { children: ReactNode; adm
     return <Navigate to="/login" replace />;
   }
   if (adminOnly && user.role !== 'ADMIN') {
-    return <Navigate to="/marketplace" replace />;
+    return <Navigate to="/catalog" replace />;
   }
   return <>{children}</>;
 }
@@ -301,7 +300,7 @@ function LandingPage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Link to={user ? '/marketplace' : '/login'} className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white transition hover:bg-[#f06d4b]">
+              <Link to={user ? '/catalog' : '/login'} className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white transition hover:bg-[#f06d4b]">
                 {user ? 'Accéder au marché' : 'Se connecter pour accéder au marché'}
               </Link>
             </div>
@@ -331,7 +330,7 @@ function LandingPage() {
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone">Moto / voiture / jet-ski / quad</div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone">Recherche avancée par budget, ville et moteur</div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone">Vérification vendeur et annonces premium</div>
-                {user && <Link to="/marketplace" className="block w-full rounded-xl bg-ember px-4 py-3 text-center text-sm font-medium text-white">Voir la marketplace</Link>}
+                {user && <Link to="/catalog" className="block w-full rounded-xl bg-ember px-4 py-3 text-center text-sm font-medium text-white">Voir la marketplace</Link>}
               </div>
 
               <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
@@ -1213,7 +1212,7 @@ function LoginPage() {
         token: response.token,
         refreshToken: response.refreshToken
       });
-      navigate(response.role === 'ADMIN' ? '/admin' : '/marketplace');
+      navigate(response.role === 'ADMIN' ? '/admin' : '/catalog');
     } catch (e) {
       setError('Identifiants invalides ou service indisponible.');
     }

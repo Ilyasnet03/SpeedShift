@@ -37,7 +37,7 @@ app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
 jwt:
   secret: ${JWT_SECRET:speedshift-super-secret-key-should-be-changed-for-production}
-  expiration-ms: 3600000
+  expiration-ms: 86400000
   refresh-expiration-ms: 604800000
 springdoc:
   api-docs:
