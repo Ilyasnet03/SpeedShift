@@ -74,10 +74,12 @@ export async function uploadImage(blob: Blob): Promise<{ url: string; thumbnailU
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body
   });
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     useAuthStore.getState().logout();
     throw new Error('Votre session a expiré. Reconnectez-vous puis réessayez.');
   }
+  if (response.status === 403) throw new Error('Envoi de la photo refusé. Réessayez avec une autre photo.');
+  if (response.status === 400) throw new Error('Cette photo n’est pas supportée. Utilisez une image JPG, PNG ou WebP.');
   if (response.status === 413) throw new Error('Une photo est trop volumineuse.');
   if (!response.ok) throw new Error(`Échec de l’envoi d’une photo (erreur ${response.status}).`);
   return response.json();
