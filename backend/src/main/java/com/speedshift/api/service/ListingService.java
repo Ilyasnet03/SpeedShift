@@ -12,11 +12,13 @@ import com.speedshift.api.repository.ListingRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class ListingService {
@@ -66,7 +68,7 @@ public class ListingService {
             .fuel(request.fuel())
             .transmission(request.transmission())
             .city(request.city().trim())
-            .countryCode("FR")
+            .countryCode("MA")
             .imageUrl(request.imageUrl())
             .thumbnailUrl(request.imageUrl())
             .price(request.price())
@@ -166,7 +168,10 @@ public class ListingService {
             all.size(),
             1842,
             21,
-            "$" + all.stream().map(Listing::getPrice).reduce(BigDecimal.ZERO, BigDecimal::add).divide(BigDecimal.valueOf(Math.max(all.size(), 1)), 2, java.math.RoundingMode.HALF_UP)
+            all.stream().map(Listing::getPrice).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .divide(BigDecimal.valueOf(Math.max(all.stream().filter(item -> item.getPrice() != null).count(), 1)), 2, RoundingMode.HALF_UP)
+                .toPlainString() + " DH"
         );
 
         return new HomeResponse(featured, latest, categories, summary);

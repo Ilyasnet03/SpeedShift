@@ -15,11 +15,26 @@ import {
   Zap
 } from 'lucide-react';
 import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { createListing, getHome, getListing, getListings, getPendingListings, loginUser, publishListing, registerUser, type CreateListingPayload } from './services/api';
+import {
+  createListing,
+  getAdminListings,
+  getAdminStats,
+  getAdminUsers,
+  getHome,
+  getListing,
+  getListings,
+  loginUser,
+  registerUser,
+  setAdminListingStatus,
+  setAdminUserEnabled,
+  setAdminUserRole,
+  type AdminListingStatus,
+  type CreateListingPayload
+} from './services/api';
 import { useAuthStore } from './store/authStore';
 
 const formatPrice = (value: number | string) =>
-  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Number(value));
+  `${new Intl.NumberFormat('fr-MA', { maximumFractionDigits: 0 }).format(Number(value))} DH`;
 
 const appNavItems = [
   { label: 'Marketplace', to: '/marketplace' },
@@ -685,7 +700,7 @@ function SellPage() {
         <label className="space-y-2 text-sm text-stone">Kilométrage
           <input type="number" min="0" value={form.mileage} onChange={(event) => updateField('mileage', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
-        <label className="space-y-2 text-sm text-stone">Prix (€)
+        <label className="space-y-2 text-sm text-stone">Prix (DH)
           <input required type="number" min="0.01" step="0.01" value={form.price} onChange={(event) => updateField('price', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
         <label className="space-y-2 text-sm text-stone">Ville
@@ -731,7 +746,7 @@ function LoginPage() {
             firstName: form.firstName,
             lastName: form.lastName,
             email: form.email,
-            phone: form.phone,
+            phone: `+212${form.phone.replace(/\D/g, '')}`,
             password: form.password
           });
 
@@ -769,7 +784,26 @@ function LoginPage() {
         )}
 
         {mode === 'register' && (
-          <input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Téléphone" />
+          <label className="block space-y-2 text-sm text-stone">
+            Téléphone marocain
+            <span className="flex overflow-hidden rounded-xl border border-white/10 bg-[#0d0f10]">
+              <span className="flex items-center border-r border-white/10 px-4 text-stone">+212</span>
+              <input
+                required
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel-national"
+                pattern="[67][0-9]{8}"
+                maxLength={9}
+                value={form.phone}
+                onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, '').slice(0, 9) })}
+                className="w-full bg-transparent p-3 text-white placeholder:text-stone/60"
+                placeholder="6 12 34 56 78"
+                title="Saisissez les 9 chiffres après +212 (commence par 6 ou 7)."
+              />
+            </span>
+            <span className="block text-xs text-stone/60">Saisissez les 9 chiffres après +212.</span>
+          </label>
         )}
 
         <input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Adresse email" />
@@ -787,51 +821,155 @@ function LoginPage() {
 
 function AdminPage() {
   const queryClient = useQueryClient();
-  const { data, isLoading, isError } = useQuery({ queryKey: ['admin', 'pending'], queryFn: getPendingListings });
-  const publishMutation = useMutation({
-    mutationFn: publishListing,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['admin', 'pending'] }),
-        queryClient.invalidateQueries({ queryKey: ['home'] }),
-        queryClient.invalidateQueries({ queryKey: ['listings'] })
-      ]);
-    }
+  const [section, setSection] = useState<'stats' | 'users' | 'listings'>('stats');
+  const [search, setSearch] = useState('');
+  const statsQuery = useQuery({ queryKey: ['admin', 'stats'], queryFn: getAdminStats, enabled: section === 'stats' });
+  const usersQuery = useQuery({ queryKey: ['admin', 'users'], queryFn: getAdminUsers, enabled: section === 'users' });
+  const listingsQuery = useQuery({ queryKey: ['admin', 'listings'], queryFn: getAdminListings, enabled: section === 'listings' });
+
+  const refreshAdminData = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['admin'] }),
+      queryClient.invalidateQueries({ queryKey: ['home'] }),
+      queryClient.invalidateQueries({ queryKey: ['listings'] })
+    ]);
+  };
+
+  const enabledMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) => setAdminUserEnabled(id, enabled),
+    onSuccess: refreshAdminData
+  });
+  const roleMutation = useMutation({
+    mutationFn: ({ id, role }: { id: number; role: 'CLIENT' | 'ADMIN' }) => setAdminUserRole(id, role),
+    onSuccess: refreshAdminData
+  });
+  const listingMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: AdminListingStatus }) => setAdminListingStatus(id, status),
+    onSuccess: refreshAdminData
   });
 
-  if (isLoading || !data) {
-    if (isError) return <ErrorPanel />;
-    return <LoadingPanel />;
-  }
+  const mutationError = enabledMutation.isError || roleMutation.isError || listingMutation.isError;
+  const tabClass = (tab: typeof section) =>
+    `rounded-full px-5 py-3 text-sm font-medium transition ${section === tab ? 'bg-ember text-white' : 'border border-white/10 bg-white/5 text-stone hover:text-white'}`;
 
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Back-office</div>
-        <h1 className="mt-2 font-display text-5xl uppercase text-white">Modération des annonces</h1>
-        <p className="mt-3 text-stone/75">Les nouvelles annonces restent invisibles sur le marché jusqu’à leur validation par un administrateur.</p>
+        <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Espace sécurisé</div>
+        <h1 className="mt-2 font-display text-5xl uppercase text-white">Dashboard admin</h1>
+        <p className="mt-3 text-stone/75">Statistiques, comptes et annonces de la marketplace.</p>
       </div>
 
-      {publishMutation.isError && <p role="alert" className="text-sm text-red-400">Impossible de publier cette annonce. Actualisez la page et réessayez.</p>}
-      {data.length === 0 ? (
-        <div className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone">Aucune annonce en attente de modération.</div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {data.map((listing: any) => (
-            <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
-              {listing.imageUrl && <img src={listing.imageUrl} alt="" className="h-48 w-full object-cover" />}
-              <div className="space-y-3 p-5">
-                <div className="text-xs uppercase tracking-[0.2em] text-ember">{listing.category}</div>
-                <h2 className="font-display text-2xl uppercase text-white">{listing.title}</h2>
-                <p className="text-sm text-stone">{listing.brand} {listing.model ?? ''} · {listing.city}</p>
-                <p className="text-sm text-stone">{formatPrice(listing.price)} · vendeur : {listing.sellerName}</p>
-                <button type="button" disabled={publishMutation.isPending} onClick={() => publishMutation.mutate(listing.id)} className="w-full rounded-full bg-ember px-4 py-3 text-sm font-medium text-white disabled:opacity-60">
-                  Publier l’annonce
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
+      <nav aria-label="Sections du dashboard" className="flex flex-wrap gap-3">
+        <button type="button" className={tabClass('stats')} onClick={() => { setSection('stats'); setSearch(''); }}>Statistiques</button>
+        <button type="button" className={tabClass('users')} onClick={() => { setSection('users'); setSearch(''); }}>Utilisateurs</button>
+        <button type="button" className={tabClass('listings')} onClick={() => { setSection('listings'); setSearch(''); }}>Annonces</button>
+      </nav>
+
+      {mutationError && <p role="alert" className="text-sm text-red-400">Action impossible. Vérifiez les droits et réessayez.</p>}
+
+      {section === 'stats' && (
+        statsQuery.isLoading ? <LoadingPanel /> : statsQuery.isError || !statsQuery.data ? <ErrorPanel /> : (
+          <section aria-label="Statistiques de la marketplace" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {[
+              ['Utilisateurs inscrits', statsQuery.data.totalUsers],
+              ['Comptes actifs', statsQuery.data.activeUsers],
+              ['Comptes suspendus', statsQuery.data.disabledUsers],
+              ['Nouveaux comptes (30 jours)', statsQuery.data.newUsersLast30Days],
+              ['Toutes les annonces', statsQuery.data.totalListings],
+              ['Annonces publiées', statsQuery.data.publishedListings],
+              ['En attente de validation', statsQuery.data.pendingListings],
+              ['Annonces refusées', statsQuery.data.rejectedListings],
+              ['Prix moyen publié', formatPrice(statsQuery.data.averagePublishedPrice)]
+            ].map(([label, value]) => (
+              <article key={String(label)} className="rounded-[24px] border border-white/10 bg-[#121416] p-6">
+                <h2 className="text-xs uppercase tracking-[0.2em] text-stone/70">{String(label)}</h2>
+                <p className="mt-3 font-display text-4xl uppercase text-white">{String(value)}</p>
+              </article>
+            ))}
+          </section>
+        )
+      )}
+
+      {section === 'users' && (
+        <section className="space-y-5">
+          <div className="flex flex-col gap-4 rounded-[24px] border border-white/10 bg-[#121416] p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-display text-3xl uppercase text-white">Gestion des utilisateurs</h2>
+              <p className="text-sm text-stone/70">Suspendre ou réactiver un compte, et gérer les rôles.</p>
+            </div>
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher nom, e-mail ou téléphone" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white placeholder:text-stone/50 sm:max-w-sm" />
+          </div>
+          {usersQuery.isLoading ? <LoadingPanel /> : usersQuery.isError || !usersQuery.data ? <ErrorPanel /> : (
+            <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-[#121416]">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-stone/60">
+                  <tr><th className="p-4">Utilisateur</th><th className="p-4">Téléphone</th><th className="p-4">Inscription</th><th className="p-4">Rôle</th><th className="p-4">État</th><th className="p-4">Actions</th></tr>
+                </thead>
+                <tbody>
+                  {usersQuery.data.filter((user) => `${user.firstName} ${user.lastName} ${user.email} ${user.phone ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((user) => (
+                    <tr key={user.id} className="border-b border-white/5 text-stone last:border-0">
+                      <td className="p-4"><div className="font-medium text-white">{user.firstName} {user.lastName}</div><div className="text-xs text-stone/60">{user.email}</div></td>
+                      <td className="p-4">{user.phone ?? '—'}</td>
+                      <td className="p-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-MA') : '—'}</td>
+                      <td className="p-4">{user.role === 'ADMIN' ? 'Administrateur' : 'Client'}</td>
+                      <td className="p-4"><span className={user.enabled ? 'text-emerald-400' : 'text-red-400'}>{user.enabled ? 'Actif' : 'Suspendu'}</span></td>
+                      <td className="space-x-2 p-4">
+                        <button type="button" disabled={enabledMutation.isPending} onClick={() => enabledMutation.mutate({ id: user.id, enabled: !user.enabled })} className="rounded-full border border-white/10 px-3 py-2 text-xs text-white disabled:opacity-50">
+                          {user.enabled ? 'Suspendre' : 'Réactiver'}
+                        </button>
+                        <button type="button" disabled={roleMutation.isPending} onClick={() => roleMutation.mutate({ id: user.id, role: user.role === 'ADMIN' ? 'CLIENT' : 'ADMIN' })} className="rounded-full border border-ember/40 px-3 py-2 text-xs text-white disabled:opacity-50">
+                          {user.role === 'ADMIN' ? 'Retirer admin' : 'Rendre admin'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {usersQuery.data.filter((user) => `${user.firstName} ${user.lastName} ${user.email} ${user.phone ?? ''}`.toLowerCase().includes(search.toLowerCase())).length === 0 && <p className="p-8 text-center text-stone">Aucun utilisateur trouvé.</p>}
+            </div>
+          )}
+        </section>
+      )}
+
+      {section === 'listings' && (
+        <section className="space-y-5">
+          <div className="flex flex-col gap-4 rounded-[24px] border border-white/10 bg-[#121416] p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-display text-3xl uppercase text-white">Gestion des annonces</h2>
+              <p className="text-sm text-stone/70">Publier, refuser ou archiver les annonces. Les changements sont réversibles.</p>
+            </div>
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher une annonce, un vendeur…" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white placeholder:text-stone/50 sm:max-w-sm" />
+          </div>
+          {listingsQuery.isLoading ? <LoadingPanel /> : listingsQuery.isError || !listingsQuery.data ? <ErrorPanel /> : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((listing) => (
+                <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
+                  {listing.imageUrl && <img src={listing.imageUrl} alt="" className="h-48 w-full object-cover" />}
+                  <div className="space-y-3 p-5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs uppercase tracking-[0.2em] text-ember">{listing.category}</span>
+                      <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{listing.status}</span>
+                    </div>
+                    <h3 className="font-display text-2xl uppercase text-white">{listing.title}</h3>
+                    <p className="text-sm text-stone">{listing.brand} {listing.model ?? ''} · {listing.city ?? '—'}</p>
+                    <p className="text-sm text-stone">{formatPrice(listing.price)} · {listing.sellerName ?? 'Vendeur inconnu'}</p>
+                    <p className="line-clamp-3 text-sm text-stone/70">{listing.description ?? 'Aucune description.'}</p>
+                    <label className="block space-y-2 text-xs text-stone/70">Statut de l’annonce
+                      <select value={(listing.status ?? 'pending').toUpperCase()} disabled={listingMutation.isPending} onChange={(event) => listingMutation.mutate({ id: listing.id, status: event.target.value as AdminListingStatus })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white disabled:opacity-50">
+                        <option value="PENDING">En attente</option>
+                        <option value="PUBLISHED">Publiée</option>
+                        <option value="REJECTED">Refusée</option>
+                        <option value="ARCHIVED">Archivée</option>
+                      </select>
+                    </label>
+                  </div>
+                </article>
+              ))}
+              {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).length === 0 && <p className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone md:col-span-2 xl:col-span-3">Aucune annonce trouvée.</p>}
+            </div>
+          )}
+        </section>
       )}
     </div>
   );

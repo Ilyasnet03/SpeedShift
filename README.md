@@ -66,10 +66,11 @@ Les services web gratuits Render peuvent se mettre en veille après une période
 - Publication d'annonces avec validation avant affichage sur le marché
 - Fiche annonce détaillée
 - Formulaire de publication
-- Back-office admin
+- Back-office admin avec statistiques, gestion des utilisateurs (rôles et suspension) et modération des annonces
+- Numéros de téléphone marocains (+212) et prix affichés en dirhams (DH)
 - API REST avec données de démonstration
 - Dockerisation complète
 
 ## Notes
 
-Le projet a été conçu comme une base fonctionnelle et démonstrative, prête à être étendue avec authentification JWT, gestion avancée des utilisateurs, messagerie temps réel et modération complète.
+Les montants sont affichés en DH sans conversion de devise des valeurs déjà enregistrées. La migration Flyway `V3` met à jour les numéros d'exemple français en format marocain ; les villes et autres informations de démonstration ne sont pas converties. L'adresse configurée dans `ADMIN_EMAIL` reçoit le rôle administrateur à sa prochaine connexion.

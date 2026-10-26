@@ -57,6 +57,39 @@ export async function getPendingListings() {
   return request<any[]>('/admin/listings/pending');
 }
 
+export async function getAdminStats() {
+  return request<AdminDashboardStats>('/admin/stats');
+}
+
+export async function getAdminUsers() {
+  return request<AdminUser[]>('/admin/users');
+}
+
+export async function setAdminUserEnabled(id: number, enabled: boolean) {
+  return request<AdminUser>(`/admin/users/${id}/enabled`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled })
+  });
+}
+
+export async function setAdminUserRole(id: number, role: 'CLIENT' | 'ADMIN') {
+  return request<AdminUser>(`/admin/users/${id}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role })
+  });
+}
+
+export async function getAdminListings() {
+  return request<AdminListing[]>('/admin/listings');
+}
+
+export async function setAdminListingStatus(id: number, status: AdminListingStatus) {
+  return request<AdminListing>(`/admin/listings/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status })
+  });
+}
+
 export async function publishListing(id: number) {
   return request<any>(`/admin/listings/${id}/publish`, { method: 'PATCH' });
 }
@@ -82,4 +115,45 @@ export type CreateListingPayload = {
   price: number;
   imageUrl?: string;
   description?: string;
+};
+
+export type AdminDashboardStats = {
+  totalUsers: number;
+  activeUsers: number;
+  disabledUsers: number;
+  newUsersLast30Days: number;
+  totalListings: number;
+  publishedListings: number;
+  pendingListings: number;
+  rejectedListings: number;
+  averagePublishedPrice: number | string;
+};
+
+export type AdminUser = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  role: 'CLIENT' | 'ADMIN';
+  enabled: boolean;
+  createdAt: string | null;
+};
+
+export type AdminListingStatus = 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
+
+export type AdminListing = {
+  id: number;
+  title: string;
+  category: string;
+  brand: string;
+  model: string | null;
+  city: string | null;
+  price: number | string;
+  sellerName: string | null;
+  sellerPhone: string | null;
+  status: string | null;
+  imageUrl: string | null;
+  description: string | null;
+  createdAt: string | null;
 };

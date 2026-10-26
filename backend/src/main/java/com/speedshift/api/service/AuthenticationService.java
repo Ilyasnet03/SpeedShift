@@ -45,7 +45,7 @@ public class AuthenticationService {
             .firstName(request.firstName())
             .lastName(request.lastName())
             .email(request.email())
-            .phone(request.phone())
+            .phone(normalizeMoroccanPhone(request.phone()))
             .password(passwordEncoder.encode(request.password()))
             .role(User.Role.CLIENT)
             .enabled(true)
@@ -78,6 +78,14 @@ public class AuthenticationService {
             user.setUpdatedAt(LocalDateTime.now());
             userRepository.save(user);
         }
+    }
+
+    private String normalizeMoroccanPhone(String phone) {
+        String digits = phone.replaceAll("[^0-9+]", "");
+        if (digits.startsWith("0")) {
+            return "+212" + digits.substring(1);
+        }
+        return digits;
     }
 
     private AuthResponse issueTokens(User user) {
