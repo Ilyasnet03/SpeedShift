@@ -1,10 +1,13 @@
 package com.speedshift.api.controller;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,28 +18,28 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/uploads")
 public class UploadController {
 
     private static final Set<String> ALLOWED_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
     private static final int MAX_SIZE = 1600;
     private static final int THUMB_SIZE = 640;
 
-    private final Path uploadDir;
+    private final JdbcTemplate jdbc;
 
-    public UploadController(@Value("${app.upload-dir:uploads}") String uploadDir) {
-        this.uploadDir = Path.of(uploadDir).toAbsolutePath().normalize();
+    public UploadController(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
     }
 
-    @PostMapping
+    @PostMapping("/api/uploads")
     public ResponseEntity<Map<String, String>> upload(@RequestParam("file") MultipartFile file) throws IOException {
         if (file.isEmpty() || file.getContentType() == null || !ALLOWED_TYPES.contains(file.getContentType())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Format d'image non supporté.");
@@ -50,11 +53,36 @@ public class UploadController {
         }
 
         String name = UUID.randomUUID() + ".jpg";
-        Files.createDirectories(uploadDir.resolve("thumbs"));
-        ImageIO.write(scale(source, MAX_SIZE), "jpg", uploadDir.resolve(name).toFile());
-        ImageIO.write(scale(source, THUMB_SIZE), "jpg", uploadDir.resolve("thumbs").resolve(name).toFile());
+        jdbc.update("INSERT INTO uploaded_images (name, data, thumbnail) VALUES (?, ?, ?)",
+            name, encode(scale(source, MAX_SIZE)), encode(scale(source, THUMB_SIZE)));
 
         return ResponseEntity.ok(Map.of("url", "/uploads/" + name, "thumbnailUrl", "/uploads/thumbs/" + name));
+    }
+    @GetMapping("/uploads/{name:[A-Za-z0-9-]+\\.jpg}")
+    public ResponseEntity<byte[]> image(@PathVariable String name) {
+        return serve("data", name);
+    }
+
+    @GetMapping("/uploads/thumbs/{name:[A-Za-z0-9-]+\\.jpg}")
+    public ResponseEntity<byte[]> thumbnail(@PathVariable String name) {
+        return serve("thumbnail", name);
+    }
+
+    private ResponseEntity<byte[]> serve(String column, String name) {
+        List<byte[]> rows = jdbc.query("SELECT " + column + " FROM uploaded_images WHERE name = ?", (rs, i) -> rs.getBytes(1), name);
+        if (rows.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+            .contentType(MediaType.IMAGE_JPEG)
+            .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
+            .body(rows.get(0));
+    }
+
+    private byte[] encode(BufferedImage image) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(image, "jpg", output);
+        return output.toByteArray();
     }
 
     // Always returns an RGB image so JPEG encoding works for PNG/WebP sources with alpha.
