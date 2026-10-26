@@ -27,6 +27,12 @@ services:
         fromDatabase:
           name: speedshift-db
           property: password
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL

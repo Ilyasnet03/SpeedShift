@@ -40,16 +40,20 @@ mvn spring-boot:run
 
 Le backend attend PostgreSQL sur `localhost:5432` par défaut. Le profil `test` utilise H2 pour les tests automatisés.
 
-## Déploiement gratuit sur Render
+## Déploiement gratuit sur Render avec Neon
 
 Le fichier `render.yaml` configure le frontend comme site statique gratuit et l'API comme service web Docker gratuit. Le frontend appelle l'API publique ; le backend n'autorise que l'origine du frontend configurée.
 
-Le Blueprint crée également une base PostgreSQL gratuite Render ; aucune URL ni aucun mot de passe de base de données n'est à saisir manuellement. **Attention : les bases PostgreSQL gratuites Render expirent après 30 jours.** Pour des données durables, utilisez une base payante ou configurez un fournisseur externe.
+Le Blueprint conserve une base PostgreSQL Render de secours, mais l'API utilise Neon via `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` et `SPRING_DATASOURCE_PASSWORD`. Ces variables ne sont pas synchronisées depuis le dépôt afin que les identifiants restent configurés dans le tableau de bord Render. La base Render gratuite expire après 30 jours : elle ne doit être supprimée qu'après vérification des données à conserver.
 
 1. Sur Render, sélectionnez **New + → Blueprint** et connectez le dépôt GitHub `Ilyasnet03/SpeedShift`.
-2. Vérifiez la liste des ressources gratuites (API, site statique, base PostgreSQL), puis sélectionnez **Apply** ou **Deploy Blueprint**.
-3. Render génère `JWT_SECRET` et renseigne automatiquement les paramètres de connexion à PostgreSQL.
-4. Ouvrez le site statique `speedshift-web` une fois les déploiements terminés.
+2. Vérifiez les ressources, puis sélectionnez **Apply** ou **Deploy Blueprint**. Render génère `JWT_SECRET` et configure sa base de secours.
+3. Dans le service `speedshift-api`, ouvrez **Environment** et renseignez les variables suivantes avec les informations de connexion Neon :
+   - `SPRING_DATASOURCE_URL` : `jdbc:postgresql://<hôte-pooler-Neon>/neondb?sslmode=require`
+   - `SPRING_DATASOURCE_USERNAME` : le rôle Neon indiqué par Neon
+   - `SPRING_DATASOURCE_PASSWORD` : le mot de passe de ce rôle
+4. Utilisez l'hôte de connexion **pooled** de Neon et conservez `sslmode=require`. Saisissez les secrets uniquement dans Render, jamais dans Git ou dans le chat. Render redéploie l'API après l'enregistrement.
+5. Vérifiez `https://speedshift-api.onrender.com/api/health`, puis ouvrez le site statique `speedshift-web`.
 
 Les services web gratuits Render peuvent se mettre en veille après une période d'inactivité. Le premier appel à l'API peut donc prendre un moment. Si Render attribue des sous-domaines différents, mettez à jour `VITE_API_BASE_URL` et `FRONTEND_URL` dans `render.yaml`, puis redéployez.
 
