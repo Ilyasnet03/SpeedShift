@@ -113,6 +113,9 @@ export function assetUrl(src: string) {
 }
 
 export function thumbUrl(src: string) {
+  if (src.includes('res.cloudinary.com') && src.includes('/image/upload/') && !src.includes('/image/upload/c_limit')) {
+    return src.replace('/image/upload/', '/image/upload/c_limit,w_640,q_auto,f_auto/');
+  }
   return assetUrl(src.startsWith('/uploads/') && !src.startsWith('/uploads/thumbs/') ? src.replace('/uploads/', '/uploads/thumbs/') : src);
 }
 

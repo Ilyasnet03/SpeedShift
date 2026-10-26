@@ -1,5 +1,6 @@
 package com.speedshift.api.controller;
 
+import com.speedshift.api.service.CloudinaryService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -34,9 +35,11 @@ public class UploadController {
     private static final int THUMB_SIZE = 640;
 
     private final JdbcTemplate jdbc;
+    private final CloudinaryService cloudinary;
 
-    public UploadController(JdbcTemplate jdbc) {
+    public UploadController(JdbcTemplate jdbc, CloudinaryService cloudinary) {
         this.jdbc = jdbc;
+        this.cloudinary = cloudinary;
     }
 
     @PostMapping("/api/uploads")
@@ -50,6 +53,11 @@ public class UploadController {
         }
         if (source == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image illisible.");
+        }
+
+        if (cloudinary.isConfigured()) {
+            String secureUrl = cloudinary.upload(encode(scale(source, MAX_SIZE)));
+            return ResponseEntity.ok(Map.of("url", secureUrl, "thumbnailUrl", CloudinaryService.thumbnailUrl(secureUrl)));
         }
 
         String name = UUID.randomUUID() + ".jpg";
