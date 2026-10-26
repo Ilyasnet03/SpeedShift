@@ -35,6 +35,20 @@ services:
         sync: false
       - key: ADMIN_EMAIL
         sync: false
+      - key: SPRING_MAIL_HOST
+        value: smtp-relay.brevo.com
+      - key: SPRING_MAIL_PORT
+        value: "587"
+      - key: SPRING_MAIL_USERNAME
+        sync: false
+      - key: SPRING_MAIL_PASSWORD
+        sync: false
+      - key: SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH
+        value: "true"
+      - key: SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE
+        value: "true"
+      - key: MAIL_FROM
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL

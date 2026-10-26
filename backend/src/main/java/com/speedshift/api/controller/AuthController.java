@@ -2,7 +2,10 @@ package com.speedshift.api.controller;
 
 import com.speedshift.api.dto.AuthDtos.AuthResponse;
 import com.speedshift.api.dto.AuthDtos.LoginRequest;
+import com.speedshift.api.dto.AuthDtos.PendingVerificationResponse;
 import com.speedshift.api.dto.AuthDtos.RegisterRequest;
+import com.speedshift.api.dto.AuthDtos.ResendCodeRequest;
+import com.speedshift.api.dto.AuthDtos.VerifyEmailRequest;
 import com.speedshift.api.service.AuthenticationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -22,8 +25,18 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<PendingVerificationResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authenticationService.register(request));
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<AuthResponse> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        return ResponseEntity.ok(authenticationService.verifyEmail(request));
+    }
+
+    @PostMapping("/resend-code")
+    public ResponseEntity<PendingVerificationResponse> resendCode(@Valid @RequestBody ResendCodeRequest request) {
+        return ResponseEntity.ok(authenticationService.resendCode(request));
     }
 
     @PostMapping("/login")

@@ -39,6 +39,9 @@ import {
   getMyListings,
   loginUser,
   registerUser,
+  verifyEmail,
+  resendVerificationCode,
+  ApiError,
   setAdminListingStatus,
   setAdminUserEnabled,
   setAdminUserRole,
@@ -1250,35 +1253,104 @@ function LoginPage() {
     password: ''
   });
   const [error, setError] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [info, setInfo] = useState<string | null>(null);
+
+  const finishLogin = (response: any) => {
+    setUser({
+      email: response.email,
+      firstName: response.firstName,
+      lastName: response.lastName,
+      role: response.role,
+      token: response.token,
+      refreshToken: response.refreshToken
+    });
+    navigate(response.role === 'ADMIN' ? '/admin' : '/catalog');
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    setInfo(null);
 
     try {
-      const response = mode === 'login'
-        ? await loginUser(form.email, form.password)
-        : await registerUser({
-            firstName: form.firstName,
-            lastName: form.lastName,
-            email: form.email,
-            phone: `+212${form.phone.replace(/\D/g, '')}`,
-            password: form.password
-          });
-
-      setUser({
-        email: response.email,
-        firstName: response.firstName,
-        lastName: response.lastName,
-        role: response.role,
-        token: response.token,
-        refreshToken: response.refreshToken
+      if (mode === 'login') {
+        finishLogin(await loginUser(form.email, form.password));
+        return;
+      }
+      await registerUser({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        phone: `+212${form.phone.replace(/\D/g, '')}`,
+        password: form.password
       });
-      navigate(response.role === 'ADMIN' ? '/admin' : '/catalog');
+      setCode('');
+      setPendingEmail(form.email);
+      setInfo(`Un code à 6 chiffres a été envoyé à ${form.email}.`);
     } catch (e) {
-      setError('Identifiants invalides ou service indisponible.');
+      if (e instanceof ApiError && e.status === 403 && mode === 'login') {
+        setCode('');
+        setPendingEmail(form.email);
+        setInfo('Votre e-mail n’est pas encore vérifié. Saisissez le code reçu ou demandez-en un nouveau.');
+        return;
+      }
+      if (e instanceof ApiError && e.status === 409) {
+        setError('Un compte existe déjà avec cet e-mail. Connectez-vous.');
+        return;
+      }
+      setError(mode === 'login' ? 'Identifiants invalides ou service indisponible.' : 'Inscription impossible. Vérifiez vos informations et réessayez.');
     }
   };
+
+  const handleVerify = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!pendingEmail) return;
+    setError(null);
+    try {
+      finishLogin(await verifyEmail(pendingEmail, code.trim()));
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      setError(
+        status === 410 ? 'Ce code a expiré. Demandez-en un nouveau.'
+        : status === 429 ? 'Trop de tentatives. Demandez un nouveau code.'
+        : status === 400 ? 'Code incorrect.'
+        : 'Vérification impossible. Réessayez.'
+      );
+    }
+  };
+
+  const handleResend = async () => {
+    if (!pendingEmail) return;
+    setError(null);
+    setInfo(null);
+    try {
+      await resendVerificationCode(pendingEmail);
+      setInfo(`Un nouveau code a été envoyé à ${pendingEmail}.`);
+    } catch (e) {
+      setError(e instanceof ApiError && e.status === 429 ? 'Patientez une minute avant de redemander un code.' : 'Envoi impossible. Réessayez.');
+    }
+  };
+
+  if (pendingEmail) {
+    return (
+      <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-8">
+        <h1 className="font-display text-3xl uppercase text-white">Vérifiez votre e-mail</h1>
+        <p className="mt-3 text-sm text-stone">Saisissez le code à 6 chiffres envoyé à <strong className="text-white">{pendingEmail}</strong>. Il est valable 15 minutes.</p>
+        <form onSubmit={handleVerify} className="mt-6 space-y-4">
+          <input required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-center text-2xl tracking-[0.5em] text-white placeholder:text-stone/60" placeholder="000000" />
+          {info && <p className="text-sm text-emerald-400">{info}</p>}
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+          <button type="submit" disabled={code.length !== 6} className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60">Valider</button>
+        </form>
+        <div className="mt-4 flex justify-between text-sm">
+          <button type="button" onClick={handleResend} className="text-ember hover:underline">Renvoyer le code</button>
+          <button type="button" onClick={() => { setPendingEmail(null); setError(null); setInfo(null); }} className="text-stone hover:text-white">Retour</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-8">

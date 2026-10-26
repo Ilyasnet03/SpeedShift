@@ -28,4 +28,13 @@ public class AuthDtos {
         String lastName,
         String role
     ) {}
+
+    public record PendingVerificationResponse(String email, boolean verificationRequired) {}
+
+    public record VerifyEmailRequest(
+        @NotBlank @Email String email,
+        @NotBlank @Pattern(regexp = "[0-9]{6}") String code
+    ) {}
+
+    public record ResendCodeRequest(@NotBlank @Email String email) {}
 }

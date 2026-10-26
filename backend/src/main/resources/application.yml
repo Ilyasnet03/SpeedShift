@@ -35,6 +35,7 @@ server:
 app:
   upload-dir: ${UPLOAD_DIR:uploads}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  mail-from: ${MAIL_FROM:}
 jwt:
   secret: ${JWT_SECRET:speedshift-super-secret-key-should-be-changed-for-production}
   expiration-ms: 86400000

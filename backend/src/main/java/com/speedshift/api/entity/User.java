@@ -50,6 +50,18 @@ public class User implements UserDetails {
     private boolean twoFactorEnabled = false;
 
     @Column(nullable = false)
+    private boolean emailVerified = true;
+
+    private String verificationCode;
+
+    private LocalDateTime verificationExpiresAt;
+
+    private LocalDateTime verificationSentAt;
+
+    @Column(nullable = false)
+    private int verificationAttempts = 0;
+
+    @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)

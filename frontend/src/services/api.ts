@@ -2,6 +2,12 @@ import { useAuthStore } from '../store/authStore';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
+export class ApiError extends Error {
+  constructor(public status: number) {
+    super(`Erreur HTTP ${status}`);
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = useAuthStore.getState().user?.token;
   const needsAuthentication = path.startsWith('/listings') || path.startsWith('/admin/');
@@ -16,7 +22,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     if (response.status === 401 && token) useAuthStore.getState().logout();
-    throw new Error(`Erreur HTTP ${response.status}`);
+    throw new ApiError(response.status);
   }
 
   const text = await response.text();
@@ -31,9 +37,23 @@ export async function loginUser(email: string, password: string) {
 }
 
 export async function registerUser(payload: any) {
-  return request<any>('/auth/register', {
+  return request<{ email: string; verificationRequired: boolean }>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(payload)
+  });
+}
+
+export async function verifyEmail(email: string, code: string) {
+  return request<any>('/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ email, code })
+  });
+}
+
+export async function resendVerificationCode(email: string) {
+  return request<any>('/auth/resend-code', {
+    method: 'POST',
+    body: JSON.stringify({ email })
   });
 }
 
