@@ -565,6 +565,7 @@ function ListingCard({ listing }: { listing: any; compact?: boolean }) {
   const liked = useFavoritesStore((state) => (state.byUser[userKey] ?? []).includes(listing.id));
   const toggleFavorite = useFavoritesStore((state) => state.toggle);
   const status = String(listing.status ?? '').toLowerCase();
+  const isPart = listing.category === 'Pièces & Accessoires';
   const image = getListingFirstImage(listing.imageUrl);
   const heading = listing.title || [listing.brand, listing.model].filter(Boolean).join(' ');
   const ago = timeAgo(listing.createdAt);
@@ -586,8 +587,12 @@ function ListingCard({ listing }: { listing: any; compact?: boolean }) {
       <Link to={`/listing/${listing.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121416] transition duration-300 hover:-translate-y-1 hover:border-ember/40 hover:shadow-soft">
         <div className="relative overflow-hidden">
           {image ? <img src={thumbUrl(image)} alt={listing.title} loading="lazy" className={`aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-105 ${status === 'sold' ? 'opacity-60 grayscale' : ''}`} /> : <div className="aspect-[4/3] bg-black/20" />}
-          <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${categoryBadgeStyles[listing.category] ?? 'bg-ember'}`}>{listing.category}</span>
-          {(status === 'sold' || status === 'reserved') && (
+          {isPart ? (
+            <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${categoryBadgeStyles[listing.category] ?? 'bg-ember'}`}>{listing.category}</span>
+          ) : (
+            <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${status === 'sold' ? 'bg-neutral-800' : status === 'reserved' ? 'bg-amber-500' : 'bg-emerald-600'}`}>{status === 'sold' ? 'Vendu' : status === 'reserved' ? 'Réservé' : 'Disponible'}</span>
+          )}
+          {isPart && (status === 'sold' || status === 'reserved') && (
             <span className={`absolute bottom-3 left-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${status === 'sold' ? 'bg-neutral-800' : 'bg-amber-500'}`}>{status === 'sold' ? 'Vendu' : 'Réservé'}</span>
           )}
           <button
