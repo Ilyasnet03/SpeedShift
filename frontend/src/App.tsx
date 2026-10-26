@@ -1,3 +1,4 @@
+import logoSpeedshift from './lib/logo-speedshift.png';
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -90,7 +91,7 @@ const appNavItems = [
 function App() {
   const user = useAuthStore((state) => state.user);
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
-    localStorage.getItem('speedshift-theme') === 'light' ? 'light' : 'dark'
+    localStorage.getItem('speedshift-theme') === 'dark' ? 'dark' : 'light'
   );
 
   useEffect(() => {
@@ -142,7 +143,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
     <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-ember text-lg font-bold text-white">S</div>
+          <img src={logoSpeedshift} alt="SpeedShift" className="h-10 w-10 rounded-md object-contain" />
           <div>
             <div className="font-display text-3xl uppercase leading-none text-white">SpeedShift</div>
             <div className="text-[10px] uppercase tracking-[0.32em] text-stone">Marketplace</div>
@@ -501,7 +502,7 @@ function MarketplacePage() {
             <h2 className="mt-2 text-4xl uppercase text-white">Dernières annonces</h2>
           </div>
         </div>
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:gap-5">
           {data.latest.map((item: any) => (
             <ListingCard key={item.id} listing={item} compact />
           ))}
@@ -516,7 +517,7 @@ function ListingCard({ listing, compact = false }: { listing: any; compact?: boo
   return (
     <Link to={`/listing/${listing.id}`} className={`group block overflow-hidden rounded-[24px] border border-white/10 bg-[#121416] transition hover:border-ember/40 ${compact ? 'h-full' : ''}`}>
       <div className="relative overflow-hidden">
-        {image ? <img src={image} alt={listing.title} className="h-56 w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="h-56 bg-black/20" />}
+        {image ? <img src={image} alt={listing.title} className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="aspect-square bg-black/20" />}
         <div className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/40 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
           <Star size={10} className="fill-current text-yellow-400" />
           {listing.sellerRating ?? '4.8'}
@@ -528,7 +529,7 @@ function ListingCard({ listing, compact = false }: { listing: any; compact?: boo
             <div className="font-display text-3xl uppercase text-white">{formatPrice(listing.price)}</div>
             <h3 className="mt-1 text-xl uppercase text-stone">{listing.title}</h3>
           </div>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-stone">{listing.year}</span>
+          {listing.year ? <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-stone">{listing.year}</span> : null}
         </div>
         <div className="flex items-center gap-2 text-sm text-stone/80">
           <MapPin size={14} />
@@ -536,7 +537,7 @@ function ListingCard({ listing, compact = false }: { listing: any; compact?: boo
         </div>
         <div className="flex items-center justify-between border-t border-white/10 pt-3 text-xs uppercase tracking-[0.2em] text-stone/70">
           <span>{listing.brand}</span>
-          <span>{listing.mileage ? `${listing.mileage.toLocaleString()} km` : '0 km'}</span>
+          {listing.mileage ? <span>{`${listing.mileage.toLocaleString()} km`}</span> : null}
         </div>
       </div>
     </Link>
@@ -605,7 +606,7 @@ function CatalogPage() {
               <option value="popular">Populaires</option>
             </select>
           </div>
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5">
             {data.map((item: any) => (
               <ListingCard key={item.id} listing={item} compact />
             ))}
@@ -633,13 +634,13 @@ function ListingDetailPage() {
   return (
     <div className="space-y-8">
       <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[#121416]">
-        {selectedImage ? <img src={selectedImage} alt={data.title} className="h-[460px] w-full object-cover" /> : <div className="flex h-[460px] items-center justify-center text-stone">Aucune photo disponible</div>}
+        {selectedImage ? <img src={selectedImage} alt={data.title} className="mx-auto aspect-square w-full max-w-[560px] object-cover" /> : <div className="flex aspect-square items-center justify-center text-stone">Aucune photo disponible</div>}
       </section>
       {images.length > 1 && (
         <div className="flex gap-3 overflow-x-auto">
           {images.map((image, index) => (
             <button key={image.slice(0, 80) + index} type="button" onClick={() => setActiveImage(index)} aria-label={`Afficher la photo ${index + 1}`} aria-pressed={index === activeImage} className={`shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImage ? 'border-ember' : 'border-white/10'}`}>
-              <img src={image} alt="" className="h-20 w-28 object-cover" />
+              <img src={image} alt="" className="h-20 w-20 object-cover" />
             </button>
           ))}
         </div>
@@ -657,12 +658,12 @@ function ListingDetailPage() {
 
           <div className="flex items-center gap-6 text-sm text-stone/80">
             <span className="flex items-center gap-2"><MapPin size={16} /> {data.city}</span>
-            <span>{data.year}</span>
-            <span>{data.mileage == null ? '—' : `${data.mileage.toLocaleString()} km`}</span>
+            {data.year ? <span>{data.year}</span> : null}
+            {data.mileage != null ? <span>{`${data.mileage.toLocaleString()} km`}</span> : null}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {Object.entries(data.specs).map(([label, value]) => (
+            {Object.entries(data.specs).filter(([, value]) => value != null && String(value).trim() !== '' && value !== '-').map(([label, value]) => (
               <div key={label} className="rounded-2xl border border-white/10 bg-[#0d0f10] p-3">
                 <div className="text-[10px] uppercase tracking-[0.22em] text-stone/70">{label}</div>
                 <div className="mt-2 text-lg text-white">{String(value)}</div>
@@ -670,19 +671,23 @@ function ListingDetailPage() {
             ))}
           </div>
 
-          <div className="space-y-2">
-            <h3 className="font-display text-3xl uppercase text-white">Description</h3>
-            <p className="max-w-3xl text-stone/85">{data.description}</p>
-          </div>
-
-          <div>
-            <h3 className="font-display text-3xl uppercase text-white">Équipements</h3>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {data.features.map((feature: string) => (
-                <span key={feature} className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs uppercase tracking-[0.2em] text-stone">{feature}</span>
-              ))}
+          {data.description?.trim() && (
+            <div className="space-y-2">
+              <h3 className="font-display text-3xl uppercase text-white">Description</h3>
+              <p className="max-w-3xl text-stone/85">{data.description}</p>
             </div>
-          </div>
+          )}
+
+          {data.features?.length > 0 && (
+            <div>
+              <h3 className="font-display text-3xl uppercase text-white">Équipements</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {data.features.map((feature: string) => (
+                  <span key={feature} className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs uppercase tracking-[0.2em] text-stone">{feature}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <aside className="space-y-5 rounded-[28px] border border-white/10 bg-[#121416] p-6">
@@ -698,6 +703,9 @@ function ListingDetailPage() {
             </div>
           </div>
           <div className="space-y-3">
+            {buildWhatsAppUrl(data.sellerPhone, data) && (
+              <a href={buildWhatsAppUrl(data.sellerPhone, data)!} target="_blank" rel="noopener noreferrer" className="block w-full rounded-full bg-[#25D366] px-4 py-3 text-center text-sm font-medium text-white">Contacter sur WhatsApp</a>
+            )}
             <a href={`tel:${data.sellerPhone}`} className="block w-full rounded-full bg-ember px-4 py-3 text-center text-sm font-medium text-white">Appeler le vendeur</a>
             <p className="text-center text-xs text-stone/70">Contactez le vendeur pour discuter de cette annonce.</p>
           </div>
@@ -707,7 +715,18 @@ function ListingDetailPage() {
   );
 }
 
+function buildWhatsAppUrl(phone: string | null | undefined, listing: any) {
+  let digits = (phone ?? '').replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  else if (digits.startsWith('0')) digits = `212${digits.slice(1)}`;
+  const details = [listing.brand, listing.model, listing.year].filter(Boolean).join(' ');
+  const message = `Bonjour, je suis intéressé(e) par votre annonce « ${listing.title} »${details ? ` (${details})` : ''} à ${formatPrice(listing.price)} sur SpeedShift. Est-elle toujours disponible ?`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
 function SellPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
@@ -730,10 +749,8 @@ function SellPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['home'] });
       queryClient.invalidateQueries({ queryKey: ['listings'] });
-      setForm({ title: '', category: 'Motos', brand: '', model: '', year: '', mileage: '', city: '', price: '', description: '' });
-      setPhotos([]);
-      setPhotoPreviews([]);
-      setPhotoError('');
+      queryClient.invalidateQueries({ queryKey: ['my-listings'] });
+      navigate('/my-listings');
     }
   });
 
@@ -825,17 +842,17 @@ function SellPage() {
         </label>
         {photoPreviews.length > 0 && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:col-span-2">
-            {photoPreviews.map((preview, index) => <img key={preview} src={preview} alt={`Aperçu de la photo ${index + 1}`} className="h-32 w-full rounded-xl object-cover" />)}
+            {photoPreviews.map((preview, index) => <img key={preview} src={preview} alt={`Aperçu de la photo ${index + 1}`} className="aspect-square w-full rounded-xl object-cover" />)}
           </div>
         )}
         {photoError && <p role="alert" className="text-sm text-red-400 md:col-span-2">{photoError}</p>}
         <label className="space-y-2 text-sm text-stone md:col-span-2">Description
           <textarea maxLength={2000} rows={5} value={form.description} onChange={(event) => updateField('description', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
-        {mutation.isSuccess && <p role="status" className="text-sm text-emerald-400 md:col-span-2">Annonce envoyée à l’équipe pour validation avant publication.</p>}
+        {mutation.isSuccess && <p role="status" className="text-sm text-emerald-400 md:col-span-2">Annonce publiée.</p>}
         {mutation.isError && <p role="alert" className="text-sm text-red-400 md:col-span-2">L’annonce n’a pas pu être enregistrée. Vérifiez les champs et réessayez.</p>}
         <button type="submit" disabled={mutation.isPending} className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60 md:col-span-2">
-          {mutation.isPending ? 'Envoi en cours…' : 'Envoyer pour validation'}
+          {mutation.isPending ? 'Envoi en cours…' : 'Publier'}
         </button>
       </form>
     </div>
@@ -873,10 +890,10 @@ function MyListingsPage() {
             <Link to="/sell" className="mt-4 inline-flex rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Publier une annonce</Link>
           </div>
         ) : (
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5">
             {listingsQuery.data.map((listing) => (
               <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
-                {getListingFirstImage(listing.imageUrl) && <img src={getListingFirstImage(listing.imageUrl)} alt="" className="h-48 w-full object-cover" />}
+                {getListingFirstImage(listing.imageUrl) && <img src={getListingFirstImage(listing.imageUrl)} alt="" className="aspect-square w-full object-cover" />}
                 <div className="space-y-3 p-5">
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="font-display text-2xl uppercase text-white">{listing.title}</h2>
@@ -1125,12 +1142,12 @@ function AdminPage() {
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher une annonce, un vendeur…" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white placeholder:text-stone/50 sm:max-w-sm" />
           </div>
           {listingsQuery.isLoading ? <LoadingPanel /> : listingsQuery.isError || !listingsQuery.data ? <ErrorPanel error={listingsQuery.error} onRetry={() => listingsQuery.refetch()} /> : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((listing) => {
                 const image = getListingFirstImage(listing.imageUrl);
                 return (
                   <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
-                    {image && <img src={image} alt="" className="h-48 w-full object-cover" />}
+                    {image && <img src={image} alt="" className="aspect-square w-full object-cover" />}
                     <div className="space-y-3 p-5">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs uppercase tracking-[0.2em] text-ember">{listing.category}</span>

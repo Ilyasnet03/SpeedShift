@@ -91,7 +91,7 @@ public class ListingService {
             .imageUrl(request.imageUrl())
             .thumbnailUrl(null)
             .price(request.price())
-            .status("pending")
+            .status("published")
             .sellerName((seller.getFirstName() + " " + seller.getLastName()).trim())
             .sellerPhone(seller.getPhone())
             .sellerId(seller.getId())
@@ -234,19 +234,23 @@ public class ListingService {
         if (listing.getYear() != null) features.add(listing.getYear() + " modèle");
         if (listing.getMileage() != null) features.add(String.format("%s km", listing.getMileage()));
         if (listing.getVerified() != null && listing.getVerified()) features.add("Vendeur vérifié");
-        return features.isEmpty() ? List.of("À partir du prix demandé") : features;
+        return features;
     }
 
     private Map<String, String> buildSpecs(Listing listing) {
-        return Map.of(
-            "Catégorie", listing.getCategory(),
-            "Marque", listing.getBrand(),
-            "Modèle", listing.getModel() == null ? "-" : listing.getModel(),
-            "Année", listing.getYear() == null ? "-" : String.valueOf(listing.getYear()),
-            "Kilométrage", listing.getMileage() == null ? "-" : listing.getMileage() + " km",
-            "Transmission", listing.getTransmission() == null ? "-" : listing.getTransmission(),
-            "Carburant", listing.getFuel() == null ? "-" : listing.getFuel(),
-            "Localisation", listing.getCity()
-        );
+        Map<String, String> specs = new java.util.LinkedHashMap<>();
+        putIfPresent(specs, "Catégorie", listing.getCategory());
+        putIfPresent(specs, "Marque", listing.getBrand());
+        putIfPresent(specs, "Modèle", listing.getModel());
+        putIfPresent(specs, "Année", listing.getYear() == null ? null : String.valueOf(listing.getYear()));
+        putIfPresent(specs, "Kilométrage", listing.getMileage() == null ? null : listing.getMileage() + " km");
+        putIfPresent(specs, "Transmission", listing.getTransmission());
+        putIfPresent(specs, "Carburant", listing.getFuel());
+        putIfPresent(specs, "Localisation", listing.getCity());
+        return specs;
+    }
+
+    private void putIfPresent(Map<String, String> map, String key, String value) {
+        if (value != null && !value.isBlank()) map.put(key, value);
     }
 }
