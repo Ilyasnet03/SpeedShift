@@ -75,6 +75,9 @@ public class ListingService {
     }
 
     public ListingResponse createListing(CreateListingRequest request, User seller) {
+        if (request.imageUrl() == null || request.imageUrl().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Au moins une photo est obligatoire.");
+        }
         LocalDateTime now = LocalDateTime.now();
         Listing listing = Listing.builder()
             .title(request.title().trim())

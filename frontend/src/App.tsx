@@ -965,6 +965,10 @@ function SellPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPhotoError('');
+    if (editingId === null && photos.length === 0) {
+      setPhotoError('Ajoutez au moins une photo.');
+      return;
+    }
     let imageUrl: string | undefined;
     try {
       const uploaded = await Promise.all(photos.map(async (photo) => (await uploadImage(await dataUrlToBlob(await imageFileToDataUrl(photo)))).url));
@@ -1044,8 +1048,8 @@ function SellPage() {
           <input maxLength={120} value={form.city} onChange={(event) => updateField('city', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
         <label className="space-y-2 text-sm text-stone md:col-span-2">
-          Photos de l’annonce (maximum 5)
-          <input type="file" accept="image/*" multiple onChange={handlePhotoChange} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white file:mr-4 file:rounded-full file:border-0 file:bg-ember file:px-4 file:py-2 file:text-sm file:text-white" />
+          Photos de l’annonce * (1 à 5)
+          <input type="file" accept="image/*" multiple required={editingId === null} onChange={handlePhotoChange} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white file:mr-4 file:rounded-full file:border-0 file:bg-ember file:px-4 file:py-2 file:text-sm file:text-white" />
           <span className="block text-xs text-stone/70">{editingId !== null ? 'Laissez vide pour conserver les photos actuelles. ' : ''}Sélectionnez des photos dans votre téléphone. Elles seront redimensionnées automatiquement avant l’envoi.</span>
         </label>
         {photoPreviews.length > 0 && (
