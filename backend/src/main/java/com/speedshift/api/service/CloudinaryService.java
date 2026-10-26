@@ -2,6 +2,8 @@ package com.speedshift.api.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
@@ -21,6 +23,8 @@ import java.util.HexFormat;
 
 @Service
 public class CloudinaryService {
+
+    private static final Logger logger = LoggerFactory.getLogger(CloudinaryService.class);
 
     private final String cloudName;
     private final String apiKey;
@@ -77,10 +81,12 @@ public class CloudinaryService {
             );
             JsonNode secureUrl = objectMapper.readTree(response).get("secure_url");
             if (secureUrl == null || secureUrl.asText().isBlank()) {
+                logger.warn("Cloudinary returned a response without a secure image URL");
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Réponse Cloudinary invalide.");
             }
             return secureUrl.asText();
         } catch (RestClientException | java.io.IOException exception) {
+            logger.warn("Cloudinary image upload failed", exception);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Échec de l'envoi de l'image vers Cloudinary.");
         }
     }

@@ -1033,7 +1033,10 @@ function SellPage() {
     }
     let imageUrl: string | undefined;
     try {
-      const uploaded = await Promise.all(photos.map(async (photo) => (await uploadImage(await dataUrlToBlob(await imageFileToDataUrl(photo)))).url));
+      const uploaded: string[] = [];
+      for (const photo of photos) {
+        uploaded.push((await uploadImage(await dataUrlToBlob(await imageFileToDataUrl(photo)))).url);
+      }
       imageUrl = uploaded.length > 1 ? JSON.stringify(uploaded) : uploaded[0];
     } catch (error) {
       setPhotoError(error instanceof Error ? error.message : 'Impossible de traiter les photos sélectionnées.');
