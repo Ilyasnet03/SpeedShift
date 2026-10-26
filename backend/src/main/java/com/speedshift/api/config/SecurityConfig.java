@@ -62,7 +62,6 @@ public class SecurityConfig {
                     "/api/health",
                     "/api/home",
                     "/api/auth/**",
-                    "/api/listings/**",
                     "/api/public/**",
                     "/actuator/health",
                     "/v3/api-docs/**",

@@ -53,7 +53,8 @@ Le Blueprint conserve une base PostgreSQL Render de secours, mais l'API utilise 
    - `SPRING_DATASOURCE_USERNAME` : le rôle Neon indiqué par Neon
    - `SPRING_DATASOURCE_PASSWORD` : le mot de passe de ce rôle
 4. Utilisez l'hôte de connexion **pooled** de Neon et conservez `sslmode=require`. Saisissez les secrets uniquement dans Render, jamais dans Git ou dans le chat. Render redéploie l'API après l'enregistrement.
-5. Vérifiez `https://speedshift-api.onrender.com/api/health`, puis ouvrez le site statique `speedshift-web`.
+5. Renseignez également `ADMIN_EMAIL` avec l'adresse du compte qui doit gérer la modération. Ce compte obtient le rôle administrateur lors de sa prochaine connexion ; les inscriptions ordinaires restent des comptes client.
+6. Vérifiez `https://speedshift-api.onrender.com/api/health`, puis ouvrez le site statique `speedshift-web`.
 
 Les services web gratuits Render peuvent se mettre en veille après une période d'inactivité. Le premier appel à l'API peut donc prendre un moment. Si Render attribue des sous-domaines différents, mettez à jour `VITE_API_BASE_URL` et `FRONTEND_URL` dans `render.yaml`, puis redéployez.
 
@@ -61,6 +62,8 @@ Les services web gratuits Render peuvent se mettre en veille après une période
 
 - Page d'accueil premium avec hero et catégories
 - Catalogue avec recherche, tri et filtres
+- Accès au marché réservé aux utilisateurs connectés ; modération des annonces réservée aux administrateurs
+- Publication d'annonces avec validation avant affichage sur le marché
 - Fiche annonce détaillée
 - Formulaire de publication
 - Back-office admin

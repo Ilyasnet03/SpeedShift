@@ -1,13 +1,10 @@
-import { type FormEvent, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { type FormEvent, type ReactNode, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  ArrowRight,
-  Bell,
   CarFront,
   ChevronRight,
   Gauge,
-  Heart,
   MapPin,
   Menu,
   Search,
@@ -17,34 +14,35 @@ import {
   Users,
   Zap
 } from 'lucide-react';
-import { Link, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { getAdminOverview, getHome, getListing, getListings, loginUser, registerUser } from './services/api';
+import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { createListing, getHome, getListing, getListings, getPendingListings, loginUser, publishListing, registerUser, type CreateListingPayload } from './services/api';
 import { useAuthStore } from './store/authStore';
 
 const formatPrice = (value: number | string) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Number(value));
 
-const navItems = [
-  { label: 'Accueil', to: '/' },
+const appNavItems = [
   { label: 'Marketplace', to: '/marketplace' },
   { label: 'Catalogue', to: '/catalog' },
-  { label: 'Publier', to: '/sell' },
-  { label: 'Admin', to: '/admin' }
+  { label: 'Publier une annonce', to: '/sell' }
 ];
 
 function App() {
+  const user = useAuthStore((state) => state.user);
+
   return (
     <div className="min-h-screen bg-carbon text-stone">
       <Header />
       <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/marketplace" element={<MarketplacePage />} />
-          <Route path="/catalog" element={<CatalogPage />} />
-          <Route path="/listing/:id" element={<ListingDetailPage />} />
-          <Route path="/sell" element={<SellPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/marketplace" element={<RequireAuth><MarketplacePage /></RequireAuth>} />
+          <Route path="/catalog" element={<RequireAuth><CatalogPage /></RequireAuth>} />
+          <Route path="/listing/:id" element={<RequireAuth><ListingDetailPage /></RequireAuth>} />
+          <Route path="/sell" element={<RequireAuth><SellPage /></RequireAuth>} />
+          <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
+          <Route path="*" element={<Navigate to={user ? '/marketplace' : '/'} replace />} />
         </Routes>
       </main>
       <Footer />
@@ -52,9 +50,24 @@ function App() {
   );
 }
 
+function RequireAuth({ children, adminOnly = false }: { children: ReactNode; adminOnly?: boolean }) {
+  const user = useAuthStore((state) => state.user);
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (adminOnly && user.role !== 'ADMIN') {
+    return <Navigate to="/marketplace" replace />;
+  }
+  return <>{children}</>;
+}
+
 function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuthStore();
+  const navItems = user
+    ? [...appNavItems, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
+    : [];
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/80 backdrop-blur">
@@ -68,6 +81,9 @@ function Header() {
         </Link>
 
         <nav className="hidden items-center gap-7 md:flex">
+          <NavLink to="/" className={({ isActive }) => `text-sm uppercase tracking-[0.18em] transition ${isActive ? 'text-white' : 'text-stone hover:text-white'}`}>
+            Accueil
+          </NavLink>
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} className={({ isActive }) => `text-sm uppercase tracking-[0.18em] transition ${isActive ? 'text-white' : 'text-stone hover:text-white'}`}>
               {item.label}
@@ -76,9 +92,6 @@ function Header() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <button className="rounded-full border border-white/10 p-2 text-stone transition hover:border-white/20 hover:text-white">
-            <Bell size={16} />
-          </button>
           {user ? (
             <div className="flex items-center gap-3">
               <Link to="/marketplace" className="rounded-full border border-ember/60 bg-ember/10 px-4 py-2 text-sm font-medium text-white">Accéder à l’app</Link>
@@ -99,11 +112,17 @@ function Header() {
         {menuOpen && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-white/10 bg-carbon md:hidden">
             <div className="flex max-w-7xl flex-col gap-3 px-4 py-4">
+              <NavLink to="/" className="text-sm uppercase tracking-[0.2em] text-stone" onClick={() => setMenuOpen(false)}>Accueil</NavLink>
               {navItems.map((item) => (
                 <NavLink key={item.to} to={item.to} className="text-sm uppercase tracking-[0.2em] text-stone" onClick={() => setMenuOpen(false)}>
                   {item.label}
                 </NavLink>
               ))}
+              {user ? (
+                <button onClick={() => { logout(); setMenuOpen(false); }} className="self-start text-sm uppercase tracking-[0.2em] text-stone">Déconnexion</button>
+              ) : (
+                <NavLink to="/login" className="text-sm uppercase tracking-[0.2em] text-stone" onClick={() => setMenuOpen(false)}>Login</NavLink>
+              )}
             </div>
           </motion.div>
         )}
@@ -131,6 +150,7 @@ function Footer() {
 }
 
 function LandingPage() {
+  const user = useAuthStore((state) => state.user);
   const pillars = [
     {
       icon: <Search size={22} />,
@@ -178,8 +198,9 @@ function LandingPage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Link to="/marketplace" className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white transition hover:bg-[#f06d4b]">Découvrir l’app</Link>
-              <Link to="/login" className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-white">Se connecter</Link>
+              <Link to={user ? '/marketplace' : '/login'} className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white transition hover:bg-[#f06d4b]">
+                {user ? 'Accéder au marché' : 'Se connecter pour accéder au marché'}
+              </Link>
             </div>
 
             <div className="flex flex-wrap gap-4 pt-2">
@@ -298,9 +319,21 @@ function LandingPage() {
 }
 
 function MarketplacePage() {
-  const { data, isLoading } = useQuery({ queryKey: ['home'], queryFn: getHome });
+  const { data, isLoading, isError } = useQuery({ queryKey: ['home'], queryFn: getHome });
+  const navigate = useNavigate();
+  const [category, setCategory] = useState('');
+  const [query, setQuery] = useState('');
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    if (category) params.set('category', category);
+    if (query.trim()) params.set('query', query.trim());
+    navigate(`/catalog${params.size ? `?${params.toString()}` : ''}`);
+  };
 
   if (isLoading || !data) {
+    if (isError) return <ErrorPanel />;
     return <LoadingPanel />;
   }
 
@@ -334,12 +367,14 @@ function MarketplacePage() {
                 <span className="text-[10px] uppercase tracking-[0.3em] text-stone/80">Recherche rapide</span>
                 <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-emerald-300">Live</span>
               </div>
-              <div className="space-y-3">
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone">Catégorie</div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone">Marque / Modèle</div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-stone">Budget</div>
-                <button className="w-full rounded-xl bg-ember px-4 py-3 text-sm font-medium text-white">Lancer la recherche</button>
-              </div>
+              <form onSubmit={submitSearch} className="space-y-3">
+                <select value={category} onChange={(event) => setCategory(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#121416] p-3 text-sm text-white">
+                  <option value="">Toutes les catégories</option>
+                  {data.categories.map((item: any) => <option key={item.name} value={item.name}>{item.name}</option>)}
+                </select>
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom, marque ou modèle" className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white placeholder:text-stone/60" />
+                <button type="submit" className="w-full rounded-xl bg-ember px-4 py-3 text-sm font-medium text-white">Lancer la recherche</button>
+              </form>
             </div>
           </div>
         </div>
@@ -405,9 +440,6 @@ function ListingCard({ listing, compact = false }: { listing: any; compact?: boo
     <Link to={`/listing/${listing.id}`} className={`group block overflow-hidden rounded-[24px] border border-white/10 bg-[#121416] transition hover:border-ember/40 ${compact ? 'h-full' : ''}`}>
       <div className="relative overflow-hidden">
         <img src={listing.imageUrl} alt={listing.title} className="h-56 w-full object-cover transition duration-500 group-hover:scale-105" />
-        <button className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/30 p-2 text-white backdrop-blur-sm">
-          <Heart size={16} />
-        </button>
         <div className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/40 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-white">
           <Star size={10} className="fill-current text-yellow-400" />
           {listing.sellerRating ?? '4.8'}
@@ -435,18 +467,19 @@ function ListingCard({ listing, compact = false }: { listing: any; compact?: boo
 }
 
 function CatalogPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const category = searchParams.get('category') ?? undefined;
-  const navigate = useNavigate();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(searchParams.get('query') ?? '');
+  const [city, setCity] = useState(searchParams.get('city') ?? '');
   const [sort, setSort] = useState('featured');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['listings', { category, query, sort }],
-    queryFn: () => getListings(category, undefined, query, sort)
+    queryKey: ['listings', { category, query, city, sort }],
+    queryFn: () => getListings(category, city, query, sort)
   });
 
   if (isLoading || !data) {
+    if (!isLoading) return <ErrorPanel />;
     return <LoadingPanel />;
   }
 
@@ -460,8 +493,8 @@ function CatalogPage() {
           </div>
           <div className="flex w-full max-w-xl items-center gap-2 rounded-full border border-white/10 bg-black/20 p-2">
             <Search size={16} className="ml-2 text-stone" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Marque, modèle, mot clé…" className="w-full bg-transparent text-sm text-white placeholder:text-stone/60 focus:outline-none" />
-            <button onClick={() => navigate(`/catalog?category=${encodeURIComponent(category ?? '')}`)} className="rounded-full bg-ember px-4 py-2 text-xs uppercase tracking-[0.2em] text-white">GO</button>
+            <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); query.trim() ? next.set('query', query.trim()) : next.delete('query'); return next; }); }} placeholder="Nom, marque ou modèle…" className="w-full bg-transparent text-sm text-white placeholder:text-stone/60 focus:outline-none" />
+            <button type="button" onClick={() => setSearchParams((previous) => { const next = new URLSearchParams(previous); query.trim() ? next.set('query', query.trim()) : next.delete('query'); return next; })} className="rounded-full bg-ember px-4 py-2 text-xs uppercase tracking-[0.2em] text-white">GO</button>
           </div>
         </div>
       </section>
@@ -470,9 +503,17 @@ function CatalogPage() {
         <aside className="rounded-[26px] border border-white/10 bg-[#121416] p-5">
           <div className="mb-4 text-[10px] uppercase tracking-[0.3em] text-ember">Filtres</div>
           <div className="space-y-4 text-sm text-stone">
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">Catégorie : {category ?? 'Toutes'}</div>
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">Budget : 5k€ - 80k€</div>
-            <div className="rounded-xl border border-white/10 bg-black/20 p-3">Localisation : France</div>
+            <label className="block space-y-2">
+              <span>Catégorie</span>
+              <select value={category ?? ''} onChange={(event) => setSearchParams((previous) => { const next = new URLSearchParams(previous); event.target.value ? next.set('category', event.target.value) : next.delete('category'); return next; })} className="w-full rounded-xl border border-white/10 bg-[#0b0c0e] p-3 text-white">
+                <option value="">Toutes</option>
+                {['Motos', 'Voitures', 'Jet Skis', 'Quads', 'Pièces & Accessoires'].map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="block space-y-2">
+              <span>Ville</span>
+              <input value={city} onChange={(event) => setCity(event.target.value)} onBlur={() => setSearchParams((previous) => { const next = new URLSearchParams(previous); city.trim() ? next.set('city', city.trim()) : next.delete('city'); return next; })} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); city.trim() ? next.set('city', city.trim()) : next.delete('city'); return next; }); }} placeholder="Ex. Paris" className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-white placeholder:text-stone/60" />
+            </label>
           </div>
         </aside>
 
@@ -484,6 +525,7 @@ function CatalogPage() {
               <option value="price_asc">Prix ↑</option>
               <option value="price_desc">Prix ↓</option>
               <option value="newest">Nouveautés</option>
+              <option value="popular">Populaires</option>
             </select>
           </div>
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -491,6 +533,7 @@ function CatalogPage() {
               <ListingCard key={item.id} listing={item} compact />
             ))}
           </div>
+          {data.length === 0 && <div className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone">Aucune annonce ne correspond à votre recherche.</div>}
         </div>
       </section>
     </div>
@@ -499,9 +542,10 @@ function CatalogPage() {
 
 function ListingDetailPage() {
   const { id } = useParams();
-  const { data, isLoading } = useQuery({ queryKey: ['listing', id], queryFn: () => getListing(Number(id)) });
+  const { data, isLoading, isError } = useQuery({ queryKey: ['listing', id], queryFn: () => getListing(Number(id)) });
 
   if (isLoading || !data) {
+    if (isError) return <ErrorPanel />;
     return <LoadingPanel />;
   }
 
@@ -524,7 +568,7 @@ function ListingDetailPage() {
           <div className="flex items-center gap-6 text-sm text-stone/80">
             <span className="flex items-center gap-2"><MapPin size={16} /> {data.city}</span>
             <span>{data.year}</span>
-            <span>{data.mileage.toLocaleString()} km</span>
+            <span>{data.mileage == null ? '—' : `${data.mileage.toLocaleString()} km`}</span>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -564,9 +608,8 @@ function ListingDetailPage() {
             </div>
           </div>
           <div className="space-y-3">
-            <button className="w-full rounded-full bg-ember px-4 py-3 text-sm font-medium text-white">Envoyer un message</button>
-            <button className="w-full rounded-full border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white">Appeler {data.sellerPhone}</button>
-            <button className="w-full rounded-full border border-white/10 bg-transparent px-4 py-3 text-sm font-medium text-white">Faire une offre</button>
+            <a href={`tel:${data.sellerPhone}`} className="block w-full rounded-full bg-ember px-4 py-3 text-center text-sm font-medium text-white">Appeler le vendeur</a>
+            <p className="text-center text-xs text-stone/70">Contactez le vendeur pour discuter de cette annonce.</p>
           </div>
         </aside>
       </section>
@@ -575,6 +618,45 @@ function ListingDetailPage() {
 }
 
 function SellPage() {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    title: '',
+    category: 'Motos',
+    brand: '',
+    model: '',
+    year: '',
+    mileage: '',
+    city: '',
+    price: '',
+    imageUrl: '',
+    description: ''
+  });
+  const mutation = useMutation({
+    mutationFn: (payload: CreateListingPayload) => createListing(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['home'] });
+      queryClient.invalidateQueries({ queryKey: ['listings'] });
+      setForm({ title: '', category: 'Motos', brand: '', model: '', year: '', mileage: '', city: '', price: '', imageUrl: '', description: '' });
+    }
+  });
+
+  const updateField = (field: keyof typeof form, value: string) => setForm((previous) => ({ ...previous, [field]: value }));
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    mutation.mutate({
+      title: form.title.trim(),
+      category: form.category,
+      brand: form.brand.trim(),
+      model: form.model.trim() || undefined,
+      year: form.year ? Number(form.year) : undefined,
+      mileage: form.mileage ? Number(form.mileage) : undefined,
+      city: form.city.trim(),
+      price: Number(form.price),
+      imageUrl: form.imageUrl.trim() || undefined,
+      description: form.description.trim() || undefined
+    });
+  };
+
   return (
     <div className="max-w-4xl rounded-[28px] border border-white/10 bg-[#121416] p-6 md:p-10">
       <div className="mb-8">
@@ -582,25 +664,45 @@ function SellPage() {
         <h1 className="mt-2 font-display text-5xl uppercase text-white">Publier une annonce</h1>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {[
-          'Catégorie',
-          'Marque / Modèle',
-          'Année',
-          'Kilométrage',
-          'Prix demandé',
-          'Ville',
-          'Photos',
-          'Description'
-        ].map((field) => (
-          <div key={field} className="rounded-2xl border border-white/10 bg-[#0d0f10] p-4 text-sm text-stone">
-            <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-stone/70">{field}</div>
-            <div className="h-8 rounded-md border border-dashed border-white/10 bg-transparent" />
-          </div>
-        ))}
-      </div>
-
-      <button className="mt-8 rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Sauvegarder le brouillon</button>
+      <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+        <label className="space-y-2 text-sm text-stone">Titre de l’annonce
+          <input required maxLength={255} value={form.title} onChange={(event) => updateField('title', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+        </label>
+        <label className="space-y-2 text-sm text-stone">Catégorie
+          <select value={form.category} onChange={(event) => updateField('category', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white">
+            {['Motos', 'Voitures', 'Jet Skis', 'Quads', 'Pièces & Accessoires'].map((category) => <option key={category}>{category}</option>)}
+          </select>
+        </label>
+        <label className="space-y-2 text-sm text-stone">Marque
+          <input required maxLength={100} value={form.brand} onChange={(event) => updateField('brand', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+        </label>
+        <label className="space-y-2 text-sm text-stone">Modèle
+          <input maxLength={100} value={form.model} onChange={(event) => updateField('model', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+        </label>
+        <label className="space-y-2 text-sm text-stone">Année
+          <input type="number" min="1900" max="2100" value={form.year} onChange={(event) => updateField('year', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+        </label>
+        <label className="space-y-2 text-sm text-stone">Kilométrage
+          <input type="number" min="0" value={form.mileage} onChange={(event) => updateField('mileage', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+        </label>
+        <label className="space-y-2 text-sm text-stone">Prix (€)
+          <input required type="number" min="0.01" step="0.01" value={form.price} onChange={(event) => updateField('price', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+        </label>
+        <label className="space-y-2 text-sm text-stone">Ville
+          <input required maxLength={120} value={form.city} onChange={(event) => updateField('city', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+        </label>
+        <label className="space-y-2 text-sm text-stone md:col-span-2">URL de la photo
+          <input type="url" maxLength={500} value={form.imageUrl} onChange={(event) => updateField('imageUrl', event.target.value)} placeholder="https://…" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" />
+        </label>
+        <label className="space-y-2 text-sm text-stone md:col-span-2">Description
+          <textarea maxLength={2000} rows={5} value={form.description} onChange={(event) => updateField('description', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+        </label>
+        {mutation.isSuccess && <p role="status" className="text-sm text-emerald-400 md:col-span-2">Annonce envoyée à l’équipe pour validation avant publication.</p>}
+        {mutation.isError && <p role="alert" className="text-sm text-red-400 md:col-span-2">L’annonce n’a pas pu être enregistrée. Vérifiez les champs et réessayez.</p>}
+        <button type="submit" disabled={mutation.isPending} className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60 md:col-span-2">
+          {mutation.isPending ? 'Envoi en cours…' : 'Envoyer pour validation'}
+        </button>
+      </form>
     </div>
   );
 }
@@ -610,11 +712,11 @@ function LoginPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [form, setForm] = useState({
-    firstName: 'Paul',
-    lastName: 'Martin',
-    email: 'paul@example.com',
-    phone: '+33612345678',
-    password: 'Password123!'
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    password: ''
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -641,7 +743,7 @@ function LoginPage() {
         token: response.token,
         refreshToken: response.refreshToken
       });
-      navigate('/marketplace');
+      navigate(response.role === 'ADMIN' ? '/admin' : '/marketplace');
     } catch (e) {
       setError('Identifiants invalides ou service indisponible.');
     }
@@ -661,17 +763,17 @@ function LoginPage() {
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         {mode === 'register' && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Prénom" />
-            <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Nom" />
+            <input required value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Prénom" />
+            <input required value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Nom" />
           </div>
         )}
 
         {mode === 'register' && (
-          <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Téléphone" />
+          <input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Téléphone" />
         )}
 
-        <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Adresse email" />
-        <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Mot de passe" />
+        <input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Adresse email" />
+        <input required type="password" minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Mot de passe" />
 
         {error && <p className="text-sm text-red-400">{error}</p>}
 
@@ -684,9 +786,21 @@ function LoginPage() {
 }
 
 function AdminPage() {
-  const { data, isLoading } = useQuery({ queryKey: ['admin'], queryFn: getAdminOverview });
+  const queryClient = useQueryClient();
+  const { data, isLoading, isError } = useQuery({ queryKey: ['admin', 'pending'], queryFn: getPendingListings });
+  const publishMutation = useMutation({
+    mutationFn: publishListing,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin', 'pending'] }),
+        queryClient.invalidateQueries({ queryKey: ['home'] }),
+        queryClient.invalidateQueries({ queryKey: ['listings'] })
+      ]);
+    }
+  });
 
   if (isLoading || !data) {
+    if (isError) return <ErrorPanel />;
     return <LoadingPanel />;
   }
 
@@ -694,73 +808,45 @@ function AdminPage() {
     <div className="space-y-8">
       <div>
         <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Back-office</div>
-        <h1 className="mt-2 font-display text-5xl uppercase text-white">Administration</h1>
+        <h1 className="mt-2 font-display text-5xl uppercase text-white">Modération des annonces</h1>
+        <p className="mt-3 text-stone/75">Les nouvelles annonces restent invisibles sur le marché jusqu’à leur validation par un administrateur.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {[
-          ['Utilisateurs', data.users],
-          ['Annonces actives', data.activeListings],
-          ['En attente', data.pending],
-          ['Signalements', data.openReports],
-          ['Messages', data.messages]
-        ].map(([label, value]) => (
-          <div key={String(label)} className="rounded-[24px] border border-white/10 bg-[#121416] p-5">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-stone/70">{String(label)}</div>
-            <div className="mt-3 font-display text-4xl uppercase text-white">{String(value)}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1.5fr_0.7fr]">
-        <div className="rounded-[26px] border border-white/10 bg-[#121416] p-5">
-          <div className="mb-4 text-[10px] uppercase tracking-[0.3em] text-ember">Action rapide</div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0d0f10] p-4">
-              <span className="text-white">Modération des annonces</span>
-              <ArrowRight size={16} className="text-ember" />
-            </div>
-            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0d0f10] p-4">
-              <span className="text-white">Clients en suspension</span>
-              <ArrowRight size={16} className="text-ember" />
-            </div>
-            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0d0f10] p-4">
-              <span className="text-white">Rapports de signalements</span>
-              <ArrowRight size={16} className="text-ember" />
-            </div>
-          </div>
+      {publishMutation.isError && <p role="alert" className="text-sm text-red-400">Impossible de publier cette annonce. Actualisez la page et réessayez.</p>}
+      {data.length === 0 ? (
+        <div className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone">Aucune annonce en attente de modération.</div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {data.map((listing: any) => (
+            <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
+              {listing.imageUrl && <img src={listing.imageUrl} alt="" className="h-48 w-full object-cover" />}
+              <div className="space-y-3 p-5">
+                <div className="text-xs uppercase tracking-[0.2em] text-ember">{listing.category}</div>
+                <h2 className="font-display text-2xl uppercase text-white">{listing.title}</h2>
+                <p className="text-sm text-stone">{listing.brand} {listing.model ?? ''} · {listing.city}</p>
+                <p className="text-sm text-stone">{formatPrice(listing.price)} · vendeur : {listing.sellerName}</p>
+                <button type="button" disabled={publishMutation.isPending} onClick={() => publishMutation.mutate(listing.id)} className="w-full rounded-full bg-ember px-4 py-3 text-sm font-medium text-white disabled:opacity-60">
+                  Publier l’annonce
+                </button>
+              </div>
+            </article>
+          ))}
         </div>
-
-        <div className="rounded-[26px] border border-white/10 bg-[#121416] p-5">
-          <div className="mb-4 text-[10px] uppercase tracking-[0.3em] text-ember">Performance</div>
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between text-sm text-stone/80">
-                <span>Nouveaux inscrits</span>
-                <span className="text-white">+18%</span>
-              </div>
-              <div className="mt-2 h-2 rounded-full bg-white/5">
-                <div className="h-full w-[72%] rounded-full bg-ember" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between text-sm text-stone/80">
-                <span>Confiance marketplace</span>
-                <span className="text-white">96%</span>
-              </div>
-              <div className="mt-2 h-2 rounded-full bg-white/5">
-                <div className="h-full w-[96%] rounded-full bg-emerald-500" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
 function LoadingPanel() {
   return <div className="rounded-[24px] border border-white/10 bg-[#121416] p-10 text-center text-stone">Chargement du marché…</div>;
+}
+
+function ErrorPanel() {
+  return (
+    <div role="alert" className="rounded-[24px] border border-red-500/20 bg-[#121416] p-10 text-center text-red-300">
+      Impossible de charger ces données. Vérifiez votre connexion ou <Link to="/login" className="underline">reconnectez-vous</Link>.
+    </div>
+  );
 }
 
 export default App;

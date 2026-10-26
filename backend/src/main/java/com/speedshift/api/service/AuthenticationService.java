@@ -5,6 +5,7 @@ import com.speedshift.api.dto.AuthDtos.LoginRequest;
 import com.speedshift.api.dto.AuthDtos.RegisterRequest;
 import com.speedshift.api.entity.User;
 import com.speedshift.api.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,17 +20,20 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final String adminEmail;
 
     public AuthenticationService(
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
         AuthenticationManager authenticationManager,
-        JwtService jwtService
+        JwtService jwtService,
+        @Value("${ADMIN_EMAIL:}") String adminEmail
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
+        this.adminEmail = adminEmail;
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -51,7 +55,7 @@ public class AuthenticationService {
             .build();
 
         userRepository.save(user);
-
+        promoteConfiguredAdmin(user);
         return issueTokens(user);
     }
 
@@ -62,8 +66,18 @@ public class AuthenticationService {
 
         User user = userRepository.findByEmail(request.email())
             .orElseThrow(() -> new IllegalArgumentException("Identifiants invalides"));
-
+        promoteConfiguredAdmin(user);
         return issueTokens(user);
+    }
+
+    private void promoteConfiguredAdmin(User user) {
+        if (!adminEmail.isBlank()
+            && adminEmail.equalsIgnoreCase(user.getEmail())
+            && user.getRole() != User.Role.ADMIN) {
+            user.setRole(User.Role.ADMIN);
+            user.setUpdatedAt(LocalDateTime.now());
+            userRepository.save(user);
+        }
     }
 
     private AuthResponse issueTokens(User user) {

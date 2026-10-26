@@ -1,22 +1,22 @@
 package com.speedshift.api.service;
 
-import com.speedshift.api.dto.ListingDtos.AdminSummary;
 import com.speedshift.api.dto.ListingDtos.CategorySummary;
+import com.speedshift.api.dto.ListingDtos.CreateListingRequest;
 import com.speedshift.api.dto.ListingDtos.HomeResponse;
 import com.speedshift.api.dto.ListingDtos.ListingDetailResponse;
 import com.speedshift.api.dto.ListingDtos.ListingResponse;
 import com.speedshift.api.dto.ListingDtos.MarketSummary;
 import com.speedshift.api.entity.Listing;
+import com.speedshift.api.entity.User;
 import com.speedshift.api.repository.ListingRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class ListingService {
@@ -29,13 +29,14 @@ public class ListingService {
 
     public List<ListingResponse> getListings(String category, String city, String query, String sort) {
         List<Listing> listings = listingRepository.findAll().stream()
+            .filter(item -> "published".equalsIgnoreCase(item.getStatus()))
             .filter(item -> category == null || category.isBlank() || item.getCategory().equalsIgnoreCase(category))
-            .filter(item -> city == null || city.isBlank() || item.getCity().equalsIgnoreCase(city))
+            .filter(item -> city == null || city.isBlank() || (item.getCity() != null && item.getCity().equalsIgnoreCase(city)))
             .filter(item -> query == null || query.isBlank() ||
-                item.getTitle().toLowerCase().contains(query.toLowerCase()) ||
-                item.getBrand().toLowerCase().contains(query.toLowerCase()) ||
-                item.getModel().toLowerCase().contains(query.toLowerCase()) ||
-                item.getDescription().toLowerCase().contains(query.toLowerCase()))
+                containsIgnoreCase(item.getTitle(), query) ||
+                containsIgnoreCase(item.getBrand(), query) ||
+                containsIgnoreCase(item.getModel(), query) ||
+                containsIgnoreCase(item.getDescription(), query))
             .toList();
 
         Comparator<Listing> comparator = switch (sort == null ? "featured" : sort) {
@@ -52,9 +53,61 @@ public class ListingService {
             .toList();
     }
 
+    public ListingResponse createListing(CreateListingRequest request, User seller) {
+        LocalDateTime now = LocalDateTime.now();
+        Listing listing = Listing.builder()
+            .title(request.title().trim())
+            .category(request.category().trim())
+            .subcategory(request.subcategory())
+            .brand(request.brand().trim())
+            .model(request.model())
+            .year(request.year())
+            .mileage(request.mileage())
+            .fuel(request.fuel())
+            .transmission(request.transmission())
+            .city(request.city().trim())
+            .countryCode("FR")
+            .imageUrl(request.imageUrl())
+            .thumbnailUrl(request.imageUrl())
+            .price(request.price())
+            .status("pending")
+            .sellerName((seller.getFirstName() + " " + seller.getLastName()).trim())
+            .sellerPhone(seller.getPhone())
+            .verified(false)
+            .sellerRating(BigDecimal.ZERO)
+            .views(0)
+            .featured(false)
+            .description(request.description())
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
+
+        return toResponse(listingRepository.save(listing));
+    }
+
+    public List<ListingResponse> getPendingListings() {
+        return listingRepository.findAll().stream()
+            .filter(item -> "pending".equalsIgnoreCase(item.getStatus()))
+            .sorted(Comparator.comparing(Listing::getCreatedAt).reversed())
+            .map(this::toResponse)
+            .toList();
+    }
+
+    public ListingResponse publishListing(Long id) {
+        Listing listing = listingRepository.findById(id)
+            .filter(item -> "pending".equalsIgnoreCase(item.getStatus()))
+            .orElseThrow(() -> new IllegalArgumentException("Pending listing not found: " + id));
+        listing.setStatus("published");
+        listing.setUpdatedAt(LocalDateTime.now());
+        return toResponse(listingRepository.save(listing));
+    }
+
     public ListingDetailResponse getListingById(Long id) {
         Listing listing = listingRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Listing not found: " + id));
+        if (!"published".equalsIgnoreCase(listing.getStatus())) {
+            throw new IllegalArgumentException("Listing not found: " + id);
+        }
 
         return new ListingDetailResponse(
             listing.getId(),
@@ -87,6 +140,7 @@ public class ListingService {
     public HomeResponse getHomePage() {
         List<Listing> all = listingRepository.findAll();
         List<ListingResponse> featured = all.stream()
+            .filter(item -> "published".equalsIgnoreCase(item.getStatus()))
             .filter(item -> Boolean.TRUE.equals(item.getFeatured()))
             .sorted(Comparator.comparing(Listing::getCreatedAt).reversed())
             .limit(4)
@@ -94,6 +148,7 @@ public class ListingService {
             .toList();
 
         List<ListingResponse> latest = all.stream()
+            .filter(item -> "published".equalsIgnoreCase(item.getStatus()))
             .sorted(Comparator.comparing(Listing::getCreatedAt).reversed())
             .limit(6)
             .map(this::toResponse)
@@ -115,13 +170,6 @@ public class ListingService {
         );
 
         return new HomeResponse(featured, latest, categories, summary);
-    }
-
-    public AdminSummary getAdminSummary() {
-        List<Listing> all = listingRepository.findAll();
-        long activeListings = all.stream().filter(item -> "published".equalsIgnoreCase(item.getStatus())).count();
-        long pending = all.stream().filter(item -> "pending".equalsIgnoreCase(item.getStatus())).count();
-        return new AdminSummary(1284L, activeListings, pending, 19L, 47L, "$1.84M");
     }
 
     private ListingResponse toResponse(Listing listing) {
@@ -148,6 +196,10 @@ public class ListingService {
             listing.getFeatured(),
             listing.getViews()
         );
+    }
+
+    private boolean containsIgnoreCase(String value, String query) {
+        return value != null && value.toLowerCase().contains(query.toLowerCase());
     }
 
     private List<String> buildFeatures(Listing listing) {

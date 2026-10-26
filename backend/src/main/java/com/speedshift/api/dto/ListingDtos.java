@@ -2,9 +2,32 @@ package com.speedshift.api.dto;
 
 import java.math.BigDecimal;
 import java.util.List;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.util.Map;
 
 public class ListingDtos {
+
+    public record CreateListingRequest(
+        @NotBlank @Size(max = 255) String title,
+        @NotBlank @Pattern(regexp = "Motos|Voitures|Jet Skis|Quads|Pièces & Accessoires") String category,
+        @Size(max = 100) String subcategory,
+        @NotBlank @Size(max = 100) String brand,
+        @Size(max = 100) String model,
+        @Min(1886) @Max(2100) Integer year,
+        @Min(0) Integer mileage,
+        @Size(max = 60) String fuel,
+        @Size(max = 60) String transmission,
+        @NotBlank @Size(max = 120) String city,
+        @NotNull @DecimalMin("0.01") BigDecimal price,
+        @Size(max = 500) String imageUrl,
+        @Size(max = 2000) String description
+    ) {}
 
     public record ListingResponse(
         Long id,
@@ -68,12 +91,4 @@ public class ListingDtos {
         Map<String, String> specs
     ) {}
 
-    public record AdminSummary(
-        Long users,
-        Long activeListings,
-        Long pending,
-        Long openReports,
-        Long messages,
-        String revenue
-    ) {}
 }

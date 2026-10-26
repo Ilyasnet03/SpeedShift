@@ -1,12 +1,16 @@
 package com.speedshift.api.controller;
 
-import com.speedshift.api.dto.ListingDtos.AdminSummary;
+import com.speedshift.api.dto.ListingDtos.CreateListingRequest;
 import com.speedshift.api.dto.ListingDtos.HomeResponse;
 import com.speedshift.api.dto.ListingDtos.ListingDetailResponse;
 import com.speedshift.api.dto.ListingDtos.ListingResponse;
 import com.speedshift.api.service.ListingService;
+import com.speedshift.api.entity.User;
+import jakarta.validation.Valid;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -40,13 +44,28 @@ public class ListingController {
         return ResponseEntity.ok(listingService.getListings(category, city, query, sort));
     }
 
+    @PostMapping("/listings")
+    public ResponseEntity<ListingResponse> createListing(
+        @Valid @RequestBody CreateListingRequest request,
+        @AuthenticationPrincipal User seller
+    ) {
+        return ResponseEntity.ok(listingService.createListing(request, seller));
+    }
+
     @GetMapping("/listings/{id}")
     public ResponseEntity<ListingDetailResponse> getListing(@PathVariable Long id) {
         return ResponseEntity.ok(listingService.getListingById(id));
     }
 
-    @GetMapping("/admin/overview")
-    public ResponseEntity<AdminSummary> adminOverview() {
-        return ResponseEntity.ok(listingService.getAdminSummary());
+    @GetMapping("/admin/listings/pending")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<ListingResponse>> pendingListings() {
+        return ResponseEntity.ok(listingService.getPendingListings());
+    }
+
+    @PatchMapping("/admin/listings/{id}/publish")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ListingResponse> publishListing(@PathVariable Long id) {
+        return ResponseEntity.ok(listingService.publishListing(id));
     }
 }

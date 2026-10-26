@@ -1,12 +1,17 @@
+import { useAuthStore } from '../store/authStore';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = useAuthStore.getState().user?.token;
+  const needsAuthentication = path.startsWith('/listings') || path.startsWith('/admin/');
   const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(needsAuthentication && token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {})
-    },
-    ...options
+    }
   });
 
   if (!response.ok) {
@@ -48,6 +53,33 @@ export async function getListing(id: number) {
   return request<any>(`/listings/${id}`);
 }
 
-export async function getAdminOverview() {
-  return request<any>('/admin/overview');
+export async function getPendingListings() {
+  return request<any[]>('/admin/listings/pending');
 }
+
+export async function publishListing(id: number) {
+  return request<any>(`/admin/listings/${id}/publish`, { method: 'PATCH' });
+}
+
+export async function createListing(payload: CreateListingPayload) {
+  return request<any>('/listings', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export type CreateListingPayload = {
+  title: string;
+  category: string;
+  subcategory?: string;
+  brand: string;
+  model?: string;
+  year?: number;
+  mileage?: number;
+  fuel?: string;
+  transmission?: string;
+  city: string;
+  price: number;
+  imageUrl?: string;
+  description?: string;
+};
