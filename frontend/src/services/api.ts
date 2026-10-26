@@ -15,6 +15,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
+    if (response.status === 401 && token) useAuthStore.getState().logout();
     throw new Error(`Erreur HTTP ${response.status}`);
   }
 
