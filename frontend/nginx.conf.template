@@ -4,6 +4,13 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    client_max_body_size 15m;
+
+    location /uploads/ {
+        proxy_pass http://${BACKEND_INTERNAL_HOSTPORT};
+        proxy_set_header Host $http_host;
+    }
+
     location /api/ {
         proxy_pass http://${BACKEND_INTERNAL_HOSTPORT};
         proxy_http_version 1.1;

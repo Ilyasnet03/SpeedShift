@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 12MB
+      max-request-size: 12MB
   application:
     name: speedshift-api
   datasource:
@@ -29,6 +33,7 @@ spring:
 server:
   port: ${PORT:8080}
 app:
+  upload-dir: ${UPLOAD_DIR:uploads}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
 jwt:
   secret: ${JWT_SECRET:speedshift-super-secret-key-should-be-changed-for-production}

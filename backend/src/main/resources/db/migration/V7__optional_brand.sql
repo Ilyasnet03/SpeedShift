@@ -1,0 +1,2 @@
+ALTER TABLE listings
+    ALTER COLUMN brand DROP NOT NULL;

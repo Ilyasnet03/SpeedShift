@@ -17,16 +17,17 @@ public class ListingDtos {
         @NotBlank @Size(max = 255) String title,
         @NotBlank @Pattern(regexp = "Motos|Voitures|Jet Skis|Quads|Pièces & Accessoires") String category,
         @Size(max = 100) String subcategory,
-        @NotBlank @Size(max = 100) String brand,
+        @Size(max = 100) String brand,
         @Size(max = 100) String model,
         @Min(1886) @Max(2100) Integer year,
         @Min(0) Integer mileage,
         @Size(max = 60) String fuel,
         @Size(max = 60) String transmission,
-        @NotBlank @Size(max = 120) String city,
+        @Size(max = 120) String city,
         @NotNull @DecimalMin("0.01") BigDecimal price,
         @Size(max = 8000000) String imageUrl,
-        @Size(max = 2000) String description
+        @Size(max = 2000) String description,
+        @Pattern(regexp = "DISPONIBLE|SUR_COMMANDE|RUPTURE") String availability
     ) {}
 
     public record ListingResponse(
@@ -51,7 +52,13 @@ public class ListingDtos {
         BigDecimal sellerRating,
         Boolean featured,
         Integer views,
-        java.time.LocalDateTime createdAt
+        java.time.LocalDateTime createdAt,
+        String availability,
+        String description
+    ) {}
+
+    public record ListingStatusRequest(
+        @NotBlank @Pattern(regexp = "PUBLISHED|RESERVED|SOLD") String status
     ) {}
 
     public record HomeResponse(
@@ -89,7 +96,8 @@ public class ListingDtos {
         Integer views,
         String description,
         List<String> features,
-        Map<String, String> specs
+        Map<String, String> specs,
+        String availability
     ) {}
 
 }

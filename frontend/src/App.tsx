@@ -6,6 +6,7 @@ import {
   CarFront,
   Clock,
   Heart,
+  SlidersHorizontal,
   ChevronRight,
   Gauge,
   MapPin,
@@ -22,6 +23,11 @@ import {
 import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   createListing,
+  updateListing,
+  updateListingStatus,
+  uploadImage,
+  assetUrl,
+  thumbUrl,
   deleteAdminListing,
   deleteMyListing,
   getAdminListings,
@@ -40,6 +46,7 @@ import {
   type CreateListingPayload
 } from './services/api';
 import { useAuthStore } from './store/authStore';
+import { useFavoritesStore } from './store/favoritesStore';
 
 const formatPrice = (value: number | string) =>
   `${new Intl.NumberFormat('fr-MA', { maximumFractionDigits: 0 }).format(Number(value))} DH`;
@@ -83,7 +90,22 @@ const imageFileToDataUrl = (file: File) => new Promise<string>((resolve, reject)
   image.src = objectUrl;
 });
 
+const statusLabels: Record<string, string> = {
+  published: 'Publiée',
+  reserved: 'Réservée',
+  sold: 'Vendue',
+  pending: 'En attente',
+  rejected: 'Refusée',
+  archived: 'Archivée'
+};
+
+const fuelOptions = ['Essence', 'Diesel', 'Hybride', 'Électrique'];
+const transmissionOptions = ['Manuelle', 'Automatique'];
+
+const dataUrlToBlob = async (dataUrl: string) => (await fetch(dataUrl)).blob();
+
 const appNavItems = [
+  { label: 'Favoris', to: '/favorites' },
   { label: 'Marché', to: '/marketplace' },
   { label: 'Catalogue', to: '/catalog' },
   { label: 'Mes annonces', to: '/my-listings' },
@@ -110,9 +132,11 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/marketplace" element={<RequireAuth><MarketplacePage /></RequireAuth>} />
           <Route path="/catalog" element={<RequireAuth><CatalogPage /></RequireAuth>} />
+          <Route path="/favorites" element={<RequireAuth><FavoritesPage /></RequireAuth>} />
           <Route path="/my-listings" element={<RequireAuth><MyListingsPage /></RequireAuth>} />
           <Route path="/listing/:id" element={<RequireAuth><ListingDetailPage /></RequireAuth>} />
           <Route path="/sell" element={<RequireAuth><SellPage /></RequireAuth>} />
+          <Route path="/listing/:id/edit" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
           <Route path="*" element={<Navigate to={user ? '/marketplace' : '/'} replace />} />
         </Routes>
@@ -145,7 +169,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
     <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-3">
-          <img src={logoSpeedshift} alt="SpeedShift" className="h-10 w-10 rounded-md object-contain" />
+          <img src={logoSpeedshift} alt="SpeedShift" className="h-10 w-10 rounded-full object-cover" />
           <div>
             <div className="font-display text-3xl uppercase leading-none text-white">SpeedShift</div>
             <div className="text-[10px] uppercase tracking-[0.32em] text-stone">Marketplace</div>
@@ -537,7 +561,10 @@ function timeAgo(value?: string | null) {
 }
 
 function ListingCard({ listing }: { listing: any; compact?: boolean }) {
-  const [liked, setLiked] = useState(false);
+  const userKey = useAuthStore((state) => state.user?.email) ?? 'guest';
+  const liked = useFavoritesStore((state) => (state.byUser[userKey] ?? []).includes(listing.id));
+  const toggleFavorite = useFavoritesStore((state) => state.toggle);
+  const status = String(listing.status ?? '').toLowerCase();
   const image = getListingFirstImage(listing.imageUrl);
   const heading = listing.title || [listing.brand, listing.model].filter(Boolean).join(' ');
   const ago = timeAgo(listing.createdAt);
@@ -558,13 +585,16 @@ function ListingCard({ listing }: { listing: any; compact?: boolean }) {
     >
       <Link to={`/listing/${listing.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121416] transition duration-300 hover:-translate-y-1 hover:border-ember/40 hover:shadow-soft">
         <div className="relative overflow-hidden">
-          {image ? <img src={image} alt={listing.title} loading="lazy" className="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="aspect-[4/3] bg-black/20" />}
+          {image ? <img src={thumbUrl(image)} alt={listing.title} loading="lazy" className={`aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-105 ${status === 'sold' ? 'opacity-60 grayscale' : ''}`} /> : <div className="aspect-[4/3] bg-black/20" />}
           <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${categoryBadgeStyles[listing.category] ?? 'bg-ember'}`}>{listing.category}</span>
+          {(status === 'sold' || status === 'reserved') && (
+            <span className={`absolute bottom-3 left-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${status === 'sold' ? 'bg-neutral-800' : 'bg-amber-500'}`}>{status === 'sold' ? 'Vendu' : 'Réservé'}</span>
+          )}
           <button
             type="button"
             aria-label={liked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
             aria-pressed={liked}
-            onClick={(event) => { event.preventDefault(); event.stopPropagation(); setLiked((value) => !value); }}
+            onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleFavorite(userKey, listing.id); }}
             className="absolute right-3 top-3 rounded-full bg-black/30 p-2 text-white backdrop-blur transition hover:bg-black/50"
           >
             <Heart size={18} className={liked ? 'fill-red-500 text-red-500' : ''} />
@@ -572,6 +602,7 @@ function ListingCard({ listing }: { listing: any; compact?: boolean }) {
         </div>
         <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
           <h3 className="line-clamp-1 text-base font-semibold text-white sm:text-lg">{heading}</h3>
+          {listing.availability && <AvailabilityBadge value={listing.availability} className="self-start" />}
           <div className="text-xl font-bold text-white sm:text-2xl">{formatPrice(listing.price)}</div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone/80 sm:text-sm">
             {listing.city && <span className="inline-flex items-center gap-1"><MapPin size={14} />{listing.city}</span>}
@@ -594,6 +625,9 @@ function CatalogPage() {
   const [query, setQuery] = useState(searchParams.get('query') ?? '');
   const [city, setCity] = useState(searchParams.get('city') ?? '');
   const [sort, setSort] = useState('featured');
+  const emptyFilters = { priceMin: '', priceMax: '', yearMin: '', yearMax: '', mileageMax: '', fuel: '', transmission: '', availability: '' };
+  const [filters, setFilters] = useState(emptyFilters);
+  const setFilter = (field: keyof typeof emptyFilters, value: string) => setFilters((previous) => ({ ...previous, [field]: value }));
 
   const { data, isLoading } = useQuery({
     queryKey: ['listings', { category, query, city, sort }],
@@ -604,6 +638,22 @@ function CatalogPage() {
     if (!isLoading) return <ErrorPanel />;
     return <LoadingPanel />;
   }
+
+  const matches = (item: any) => {
+    const price = Number(item.price);
+    if (filters.priceMin && price < Number(filters.priceMin)) return false;
+    if (filters.priceMax && price > Number(filters.priceMax)) return false;
+    if (filters.yearMin && !(item.year >= Number(filters.yearMin))) return false;
+    if (filters.yearMax && !(item.year <= Number(filters.yearMax))) return false;
+    if (filters.mileageMax && !(item.mileage != null && item.mileage <= Number(filters.mileageMax))) return false;
+    if (filters.fuel && !String(item.fuel ?? '').toLowerCase().startsWith(filters.fuel.toLowerCase().slice(0, 4))) return false;
+    if (filters.transmission && !String(item.transmission ?? '').toLowerCase().startsWith(filters.transmission.toLowerCase().slice(0, 4))) return false;
+    if (filters.availability && item.availability !== filters.availability) return false;
+    return true;
+  };
+  const filtered = data.filter(matches);
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const filterInput = 'w-full rounded-xl border border-white/10 bg-black/20 p-3 text-white placeholder:text-stone/60';
 
   return (
     <div className="space-y-8">
@@ -636,12 +686,58 @@ function CatalogPage() {
               <span>Ville</span>
               <input value={city} onChange={(event) => setCity(event.target.value)} onBlur={() => setSearchParams((previous) => { const next = new URLSearchParams(previous); city.trim() ? next.set('city', city.trim()) : next.delete('city'); return next; })} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); city.trim() ? next.set('city', city.trim()) : next.delete('city'); return next; }); }} placeholder="Ex. Casablanca" className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-white placeholder:text-stone/60" />
             </label>
+            <div className="space-y-2">
+              <span>Prix (DH)</span>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" min="0" inputMode="numeric" value={filters.priceMin} onChange={(event) => setFilter('priceMin', event.target.value)} placeholder="Min" aria-label="Prix minimum" className={filterInput} />
+                <input type="number" min="0" inputMode="numeric" value={filters.priceMax} onChange={(event) => setFilter('priceMax', event.target.value)} placeholder="Max" aria-label="Prix maximum" className={filterInput} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <span>Année</span>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" min="1900" max="2100" value={filters.yearMin} onChange={(event) => setFilter('yearMin', event.target.value)} placeholder="De" aria-label="Année minimum" className={filterInput} />
+                <input type="number" min="1900" max="2100" value={filters.yearMax} onChange={(event) => setFilter('yearMax', event.target.value)} placeholder="À" aria-label="Année maximum" className={filterInput} />
+              </div>
+            </div>
+            <label className="block space-y-2">
+              <span>Kilométrage max</span>
+              <input type="number" min="0" inputMode="numeric" value={filters.mileageMax} onChange={(event) => setFilter('mileageMax', event.target.value)} placeholder="Ex. 80000" className={filterInput} />
+            </label>
+            <label className="block space-y-2">
+              <span>Carburant</span>
+              <select value={filters.fuel} onChange={(event) => setFilter('fuel', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0b0c0e] p-3 text-white">
+                <option value="">Tous</option>
+                {fuelOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="block space-y-2">
+              <span>Boîte de vitesses</span>
+              <select value={filters.transmission} onChange={(event) => setFilter('transmission', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0b0c0e] p-3 text-white">
+                <option value="">Toutes</option>
+                {transmissionOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            {(!category || category === 'Pièces & Accessoires') && (
+              <label className="block space-y-2">
+                <span>Disponibilité (pièces)</span>
+                <select value={filters.availability} onChange={(event) => setFilter('availability', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0b0c0e] p-3 text-white">
+                  <option value="">Toutes</option>
+                  {availabilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+            )}
+            {activeFilterCount > 0 && (
+              <button type="button" onClick={() => setFilters(emptyFilters)} className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white">
+                <SlidersHorizontal size={14} /> Réinitialiser ({activeFilterCount})
+              </button>
+            )}
           </div>
         </aside>
 
         <div className="space-y-5">
           <div className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#121416] px-4 py-3">
-            <div className="text-sm text-stone/80">{data.length} résultats</div>
+            <div className="text-sm text-stone/80">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</div>
             <select value={sort} onChange={(e) => setSort(e.target.value)} className="rounded-full border border-white/10 bg-[#0b0c0e] px-3 py-2 text-sm text-white">
               <option value="featured">À la une</option>
               <option value="price_asc">Prix ↑</option>
@@ -651,11 +747,11 @@ function CatalogPage() {
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:gap-5">
-            {data.map((item: any) => (
+            {filtered.map((item: any) => (
               <ListingCard key={item.id} listing={item} compact />
             ))}
           </div>
-          {data.length === 0 && <div className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone">Aucune annonce ne correspond à votre recherche.</div>}
+          {filtered.length === 0 && <div className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone">Aucune annonce ne correspond à votre recherche.</div>}
         </div>
       </section>
     </div>
@@ -678,13 +774,13 @@ function ListingDetailPage() {
   return (
     <div className="space-y-8">
       <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[#121416]">
-        {selectedImage ? <img src={selectedImage} alt={data.title} className="mx-auto aspect-square w-full max-w-[560px] object-cover" /> : <div className="flex aspect-square items-center justify-center text-stone">Aucune photo disponible</div>}
+        {selectedImage ? <img src={assetUrl(selectedImage)} alt={data.title} className="mx-auto aspect-square w-full max-w-[560px] object-cover" /> : <div className="flex aspect-square items-center justify-center text-stone">Aucune photo disponible</div>}
       </section>
       {images.length > 1 && (
         <div className="flex gap-3 overflow-x-auto">
           {images.map((image, index) => (
             <button key={image.slice(0, 80) + index} type="button" onClick={() => setActiveImage(index)} aria-label={`Afficher la photo ${index + 1}`} aria-pressed={index === activeImage} className={`shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImage ? 'border-ember' : 'border-white/10'}`}>
-              <img src={image} alt="" className="h-20 w-20 object-cover" />
+              <img src={thumbUrl(image)} alt="" className="h-20 w-20 object-cover" />
             </button>
           ))}
         </div>
@@ -697,7 +793,7 @@ function ListingDetailPage() {
               <div className="text-[10px] uppercase tracking-[0.26em] text-ember">{data.category}</div>
               <h1 className="mt-2 text-5xl uppercase text-white">{data.title}</h1>
             </div>
-            <div className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-stone">{data.status}</div>
+            <div className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-stone">{statusLabels[String(data.status).toLowerCase()] ?? data.status}</div>
           </div>
 
           <div className="flex items-center gap-6 text-sm text-stone/80">
@@ -736,6 +832,7 @@ function ListingDetailPage() {
 
         <aside className="space-y-5 rounded-[28px] border border-white/10 bg-[#121416] p-6">
           <div className="font-display text-5xl uppercase text-ember">{formatPrice(data.price)}</div>
+          {data.availability && <AvailabilityBadge value={data.availability} />}
           <div className="rounded-2xl border border-white/10 bg-[#0d0f10] p-4">
             <div className="flex items-center justify-between text-sm text-stone/80">
               <span>Vendeur</span>
@@ -747,10 +844,14 @@ function ListingDetailPage() {
             </div>
           </div>
           <div className="space-y-3">
+            {String(data.status).toLowerCase() === 'sold' ? (
+              <p className="rounded-2xl border border-white/10 bg-[#0d0f10] p-4 text-center text-sm text-stone">Cette annonce est vendue.</p>
+            ) : (<>
             {buildWhatsAppUrl(data.sellerPhone, data) && (
               <a href={buildWhatsAppUrl(data.sellerPhone, data)!} target="_blank" rel="noopener noreferrer" className="block w-full rounded-full bg-[#25D366] px-4 py-3 text-center text-sm font-medium text-white">Contacter sur WhatsApp</a>
             )}
             <a href={`tel:${data.sellerPhone}`} className="block w-full rounded-full bg-ember px-4 py-3 text-center text-sm font-medium text-white">Appeler le vendeur</a>
+            </>)}
             <p className="text-center text-xs text-stone/70">Contactez le vendeur pour discuter de cette annonce.</p>
           </div>
         </aside>
@@ -769,9 +870,26 @@ function buildWhatsAppUrl(phone: string | null | undefined, listing: any) {
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
+const PARTS_CATEGORY = 'Pièces & Accessoires';
+const availabilityOptions = [
+  { value: 'DISPONIBLE', label: 'Disponible', style: 'bg-emerald-500' },
+  { value: 'SUR_COMMANDE', label: 'Sur commande', style: 'bg-amber-500' },
+  { value: 'RUPTURE', label: 'Rupture de stock', style: 'bg-red-500' }
+];
+
+function AvailabilityBadge({ value, className = '' }: { value?: string | null; className?: string }) {
+  const option = availabilityOptions.find((item) => item.value === value);
+  if (!option) return null;
+  return <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold text-white ${option.style} ${className}`}>{option.label}</span>;
+}
+
 function SellPage() {
+  const { id } = useParams();
+  const editingId = id ? Number(id) : null;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const myListingsQuery = useQuery({ queryKey: ['my-listings'], queryFn: getMyListings, enabled: editingId !== null });
+  const editingListing = editingId !== null ? myListingsQuery.data?.find((item) => item.id === editingId) : undefined;
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState('');
@@ -784,13 +902,36 @@ function SellPage() {
     mileage: '',
     city: '',
     price: '',
-    description: ''
+    description: '',
+    availability: 'DISPONIBLE',
+    fuel: '',
+    transmission: ''
   });
+  const [prefilled, setPrefilled] = useState(false);
+  useEffect(() => {
+    if (!editingListing || prefilled) return;
+    setForm({
+      title: editingListing.title ?? '',
+      category: editingListing.category ?? 'Motos',
+      brand: editingListing.brand ?? '',
+      model: editingListing.model ?? '',
+      year: editingListing.year ? String(editingListing.year) : '',
+      mileage: editingListing.mileage ? String(editingListing.mileage) : '',
+      city: editingListing.city ?? '',
+      price: String(editingListing.price ?? ''),
+      description: editingListing.description ?? '',
+      availability: editingListing.availability ?? 'DISPONIBLE',
+      fuel: editingListing.fuel ?? '',
+      transmission: editingListing.transmission ?? ''
+    });
+    setPrefilled(true);
+  }, [editingListing, prefilled]);
   useEffect(() => () => photoPreviews.forEach((preview) => URL.revokeObjectURL(preview)), [photoPreviews]);
 
   const mutation = useMutation({
-    mutationFn: (payload: CreateListingPayload) => createListing(payload),
+    mutationFn: (payload: CreateListingPayload) => editingId !== null ? updateListing(editingId, payload) : createListing(payload),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['listing'] });
       queryClient.invalidateQueries({ queryKey: ['home'] });
       queryClient.invalidateQueries({ queryKey: ['listings'] });
       queryClient.invalidateQueries({ queryKey: ['my-listings'] });
@@ -822,11 +963,8 @@ function SellPage() {
     setPhotoError('');
     let imageUrl: string | undefined;
     try {
-      const images = await Promise.all(photos.map(imageFileToDataUrl));
-      imageUrl = images.length > 1 ? JSON.stringify(images) : images[0];
-      if (imageUrl && imageUrl.length > 7_500_000) {
-        throw new Error('Les photos sont trop volumineuses. Réduisez leur nombre ou choisissez des fichiers plus petits.');
-      }
+      const uploaded = await Promise.all(photos.map(async (photo) => (await uploadImage(await dataUrlToBlob(await imageFileToDataUrl(photo)))).url));
+      imageUrl = uploaded.length > 1 ? JSON.stringify(uploaded) : uploaded[0];
     } catch (error) {
       setPhotoError(error instanceof Error ? error.message : 'Impossible de traiter les photos sélectionnées.');
       return;
@@ -834,14 +972,17 @@ function SellPage() {
     mutation.mutate({
       title: form.title.trim(),
       category: form.category,
-      brand: form.brand.trim(),
+      brand: form.brand.trim() || undefined,
       model: form.model.trim() || undefined,
       year: form.year ? Number(form.year) : undefined,
       mileage: form.mileage ? Number(form.mileage) : undefined,
-      city: form.city.trim(),
+      city: form.city.trim() || undefined,
       price: Number(form.price),
       imageUrl,
-      description: form.description.trim() || undefined
+      description: form.description.trim() || undefined,
+      fuel: form.fuel || undefined,
+      transmission: form.transmission || undefined,
+      availability: form.category === PARTS_CATEGORY ? form.availability : undefined
     });
   };
 
@@ -849,20 +990,27 @@ function SellPage() {
     <div className="max-w-4xl rounded-[28px] border border-white/10 bg-[#121416] p-6 md:p-10">
       <div className="mb-8">
         <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Vendre</div>
-        <h1 className="mt-2 font-display text-5xl uppercase text-white">Publier une annonce</h1>
+        <h1 className="mt-2 font-display text-5xl uppercase text-white">{editingId !== null ? 'Modifier mon annonce' : 'Publier une annonce'}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-2 text-sm text-stone">Titre de l’annonce
+        <label className="space-y-2 text-sm text-stone">Titre de l’annonce *
           <input required maxLength={255} value={form.title} onChange={(event) => updateField('title', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
-        <label className="space-y-2 text-sm text-stone">Catégorie
+        <label className="space-y-2 text-sm text-stone">Catégorie *
           <select value={form.category} onChange={(event) => updateField('category', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white">
             {['Motos', 'Voitures', 'Jet Skis', 'Quads', 'Pièces & Accessoires'].map((category) => <option key={category}>{category}</option>)}
           </select>
         </label>
+        {form.category === PARTS_CATEGORY && (
+          <label className="space-y-2 text-sm text-stone md:col-span-2">Disponibilité
+            <select value={form.availability} onChange={(event) => updateField('availability', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white">
+              {availabilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+        )}
         <label className="space-y-2 text-sm text-stone">Marque
-          <input required maxLength={100} value={form.brand} onChange={(event) => updateField('brand', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+          <input maxLength={100} value={form.brand} onChange={(event) => updateField('brand', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
         <label className="space-y-2 text-sm text-stone">Modèle
           <input maxLength={100} value={form.model} onChange={(event) => updateField('model', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
@@ -870,19 +1018,31 @@ function SellPage() {
         <label className="space-y-2 text-sm text-stone">Année
           <input type="number" min="1900" max="2100" value={form.year} onChange={(event) => updateField('year', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
+        <label className="space-y-2 text-sm text-stone">Carburant
+          <select value={form.fuel} onChange={(event) => updateField('fuel', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white">
+            <option value="">Non précisé</option>
+            {fuelOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <label className="space-y-2 text-sm text-stone">Boîte de vitesses
+          <select value={form.transmission} onChange={(event) => updateField('transmission', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white">
+            <option value="">Non précisée</option>
+            {transmissionOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
         <label className="space-y-2 text-sm text-stone">Kilométrage
           <input type="number" min="0" value={form.mileage} onChange={(event) => updateField('mileage', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
-        <label className="space-y-2 text-sm text-stone">Prix (DH)
+        <label className="space-y-2 text-sm text-stone">Prix (DH) *
           <input required type="number" min="0.01" step="0.01" value={form.price} onChange={(event) => updateField('price', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
         <label className="space-y-2 text-sm text-stone">Ville
-          <input required maxLength={120} value={form.city} onChange={(event) => updateField('city', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+          <input maxLength={120} value={form.city} onChange={(event) => updateField('city', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
         <label className="space-y-2 text-sm text-stone md:col-span-2">
           Photos de l’annonce (maximum 5)
           <input type="file" accept="image/*" multiple onChange={handlePhotoChange} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white file:mr-4 file:rounded-full file:border-0 file:bg-ember file:px-4 file:py-2 file:text-sm file:text-white" />
-          <span className="block text-xs text-stone/70">Sélectionnez des photos dans votre téléphone. Elles seront redimensionnées automatiquement avant l’envoi.</span>
+          <span className="block text-xs text-stone/70">{editingId !== null ? 'Laissez vide pour conserver les photos actuelles. ' : ''}Sélectionnez des photos dans votre téléphone. Elles seront redimensionnées automatiquement avant l’envoi.</span>
         </label>
         {photoPreviews.length > 0 && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:col-span-2">
@@ -893,10 +1053,10 @@ function SellPage() {
         <label className="space-y-2 text-sm text-stone md:col-span-2">Description
           <textarea maxLength={2000} rows={5} value={form.description} onChange={(event) => updateField('description', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
-        {mutation.isSuccess && <p role="status" className="text-sm text-emerald-400 md:col-span-2">Annonce publiée.</p>}
+        
         {mutation.isError && <p role="alert" className="text-sm text-red-400 md:col-span-2">L’annonce n’a pas pu être enregistrée. Vérifiez les champs et réessayez.</p>}
         <button type="submit" disabled={mutation.isPending} className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60 md:col-span-2">
-          {mutation.isPending ? 'Envoi en cours…' : 'Publier'}
+          {mutation.isPending ? 'Envoi en cours…' : editingId !== null ? 'Enregistrer les modifications' : 'Publier'}
         </button>
       </form>
     </div>
@@ -919,6 +1079,18 @@ function MyListingsPage() {
     }
   });
 
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: 'PUBLISHED' | 'RESERVED' | 'SOLD' }) => updateListingStatus(id, status),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['my-listings'] }),
+        queryClient.invalidateQueries({ queryKey: ['home'] }),
+        queryClient.invalidateQueries({ queryKey: ['listings'] }),
+        queryClient.invalidateQueries({ queryKey: ['listing'] })
+      ]);
+    }
+  });
+
   return (
     <section className="space-y-6">
       <div>
@@ -937,14 +1109,23 @@ function MyListingsPage() {
           <div className="grid grid-cols-2 gap-3 sm:gap-5">
             {listingsQuery.data.map((listing) => (
               <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
-                {getListingFirstImage(listing.imageUrl) && <img src={getListingFirstImage(listing.imageUrl)} alt="" className="aspect-square w-full object-cover" />}
+                {getListingFirstImage(listing.imageUrl) && <img src={thumbUrl(getListingFirstImage(listing.imageUrl)!)} alt="" className="aspect-square w-full object-cover" />}
                 <div className="space-y-3 p-5">
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="font-display text-2xl uppercase text-white">{listing.title}</h2>
-                    <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{listing.status}</span>
+                    <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{statusLabels[String(listing.status).toLowerCase()] ?? listing.status}</span>
                   </div>
-                  <p className="text-sm text-stone">{listing.brand} {listing.model ?? ''} · {listing.city ?? '—'}</p>
+                  <p className="text-sm text-stone">{[listing.brand, listing.model, listing.city].filter(Boolean).join(' · ')}</p>
                   <p className="font-display text-2xl text-ember">{formatPrice(listing.price)}</p>
+                  <AvailabilityBadge value={listing.availability} />
+                  {['published', 'reserved', 'sold'].includes(String(listing.status).toLowerCase()) && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {String(listing.status).toLowerCase() !== 'published' && <button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: listing.id, status: 'PUBLISHED' })} className="rounded-full border border-emerald-500/40 px-3 py-2 text-xs text-emerald-500 disabled:opacity-50">Remettre en vente</button>}
+                      {String(listing.status).toLowerCase() === 'published' && <button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: listing.id, status: 'RESERVED' })} className="rounded-full border border-amber-500/40 px-3 py-2 text-xs text-amber-500 disabled:opacity-50">Marquer réservé</button>}
+                      {String(listing.status).toLowerCase() !== 'sold' && <button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: listing.id, status: 'SOLD' })} className="rounded-full border border-white/20 px-3 py-2 text-xs text-white disabled:opacity-50">Marquer vendu</button>}
+                    </div>
+                  )}
+                  <Link to={`/listing/${listing.id}/edit`} className="block w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-center text-sm text-white">Modifier mon annonce</Link>
                   <button type="button" disabled={deleteMutation.isPending} onClick={() => {
                     if (window.confirm(`Supprimer définitivement votre annonce « ${listing.title} » ?`)) {
                       deleteMutation.mutate(listing.id);
@@ -957,6 +1138,35 @@ function MyListingsPage() {
             ))}
           </div>
         )
+      )}
+    </section>
+  );
+}
+
+function FavoritesPage() {
+  const userKey = useAuthStore((state) => state.user?.email) ?? 'guest';
+  const favoriteIds = useFavoritesStore((state) => state.byUser[userKey]);
+  const { data, isLoading, isError } = useQuery({ queryKey: ['listings', 'favorites'], queryFn: () => getListings() });
+
+  if (isLoading) return <LoadingPanel />;
+  if (isError || !data) return <ErrorPanel />;
+  const favorites = data.filter((item: any) => (favoriteIds ?? []).includes(item.id));
+
+  return (
+    <section className="space-y-6">
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Mon compte</div>
+        <h1 className="mt-2 font-display text-5xl uppercase text-white">Mes favoris</h1>
+      </div>
+      {favorites.length === 0 ? (
+        <div className="rounded-[24px] border border-white/10 bg-[#121416] p-10 text-center text-stone">
+          Vous n’avez pas encore de favoris. Touchez le cœur d’une annonce pour la retrouver ici.
+          <Link to="/catalog" className="mt-4 inline-flex rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Parcourir le catalogue</Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:gap-5">
+          {favorites.map((item: any) => <ListingCard key={item.id} listing={item} />)}
+        </div>
       )}
     </section>
   );
@@ -1187,7 +1397,7 @@ function AdminPage() {
           </div>
           {listingsQuery.isLoading ? <LoadingPanel /> : listingsQuery.isError || !listingsQuery.data ? <ErrorPanel error={listingsQuery.error} onRetry={() => listingsQuery.refetch()} /> : (
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((listing) => {
+              {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand ?? ''} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((listing) => {
                 const image = getListingFirstImage(listing.imageUrl);
                 return (
                   <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
@@ -1198,7 +1408,7 @@ function AdminPage() {
                         <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{listing.status}</span>
                       </div>
                       <h3 className="font-display text-2xl uppercase text-white">{listing.title}</h3>
-                      <p className="text-sm text-stone">{listing.brand} {listing.model ?? ''} · {listing.city ?? '—'}</p>
+                      <p className="text-sm text-stone">{[listing.brand, listing.model, listing.city].filter(Boolean).join(' · ')}</p>
                       <p className="text-sm text-stone">{formatPrice(listing.price)} · {listing.sellerName ?? 'Vendeur inconnu'}</p>
                       <p className="line-clamp-3 text-sm text-stone/70">{listing.description ?? 'Aucune description.'}</p>
                       <label className="block space-y-2 text-xs text-stone/70">Statut de l’annonce
@@ -1220,7 +1430,7 @@ function AdminPage() {
                   </article>
                 );
               })}
-              {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).length === 0 && <p className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone md:col-span-2 xl:col-span-3">Aucune annonce trouvée.</p>}
+              {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand ?? ''} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).length === 0 && <p className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone md:col-span-2 xl:col-span-3">Aucune annonce trouvée.</p>}
             </div>
           )}
         </section>

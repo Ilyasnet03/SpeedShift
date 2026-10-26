@@ -34,7 +34,7 @@ public class ListingService {
 
     public List<ListingResponse> getListings(String category, String city, String query, String sort) {
         List<Listing> listings = listingRepository.findAll().stream()
-            .filter(item -> "published".equalsIgnoreCase(item.getStatus()))
+            .filter(item -> isPublic(item.getStatus()))
             .filter(item -> category == null || category.isBlank() || item.getCategory().equalsIgnoreCase(category))
             .filter(item -> city == null || city.isBlank() || (item.getCity() != null && item.getCity().equalsIgnoreCase(city)))
             .filter(item -> query == null || query.isBlank() ||
@@ -80,18 +80,19 @@ public class ListingService {
             .title(request.title().trim())
             .category(request.category().trim())
             .subcategory(request.subcategory())
-            .brand(request.brand().trim())
+            .brand(clean(request.brand()))
             .model(request.model())
             .year(request.year())
             .mileage(request.mileage())
             .fuel(request.fuel())
             .transmission(request.transmission())
-            .city(request.city().trim())
+            .city(clean(request.city()))
             .countryCode("MA")
             .imageUrl(request.imageUrl())
             .thumbnailUrl(null)
             .price(request.price())
             .status("published")
+            .availability(resolveAvailability(request))
             .sellerName((seller.getFirstName() + " " + seller.getLastName()).trim())
             .sellerPhone(seller.getPhone())
             .sellerId(seller.getId())
@@ -105,6 +106,57 @@ public class ListingService {
             .build();
 
         return toResponse(listingRepository.save(listing));
+    }
+
+    @Transactional
+    public ListingResponse updateListing(Long id, CreateListingRequest request, User actor) {
+        Listing listing = listingRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Annonce introuvable."));
+        if (actor.getRole() != User.Role.ADMIN && !actor.getId().equals(listing.getSellerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Vous ne pouvez modifier que vos propres annonces.");
+        }
+        listing.setTitle(request.title().trim());
+        listing.setCategory(request.category().trim());
+        listing.setSubcategory(request.subcategory());
+        listing.setBrand(clean(request.brand()));
+        listing.setModel(request.model());
+        listing.setYear(request.year());
+        listing.setMileage(request.mileage());
+        listing.setFuel(request.fuel());
+        listing.setTransmission(request.transmission());
+        listing.setCity(clean(request.city()));
+        listing.setPrice(request.price());
+        listing.setDescription(request.description());
+        listing.setAvailability(resolveAvailability(request));
+        if (request.imageUrl() != null && !request.imageUrl().isBlank()) {
+            listing.setImageUrl(request.imageUrl());
+        }
+        listing.setUpdatedAt(LocalDateTime.now());
+        return toResponse(listingRepository.save(listing));
+    }
+
+    private String resolveAvailability(CreateListingRequest request) {
+        if (!"Pièces & Accessoires".equals(request.category().trim())) return null;
+        return request.availability() == null ? "DISPONIBLE" : request.availability();
+    }
+
+    @Transactional
+    public ListingResponse updateListingStatus(Long id, String status, User actor) {
+        Listing listing = listingRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Annonce introuvable."));
+        if (actor.getRole() != User.Role.ADMIN && !actor.getId().equals(listing.getSellerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Vous ne pouvez modifier que vos propres annonces.");
+        }
+        if (!isPublic(listing.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Le statut de cette annonce ne peut pas être modifié.");
+        }
+        listing.setStatus(status.toLowerCase(java.util.Locale.ROOT));
+        listing.setUpdatedAt(LocalDateTime.now());
+        return toResponse(listingRepository.save(listing));
+    }
+
+    private boolean isPublic(String status) {
+        return "published".equalsIgnoreCase(status) || "reserved".equalsIgnoreCase(status) || "sold".equalsIgnoreCase(status);
     }
 
     public List<ListingResponse> getPendingListings() {
@@ -127,7 +179,7 @@ public class ListingService {
     public ListingDetailResponse getListingById(Long id) {
         Listing listing = listingRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Listing not found: " + id));
-        if (!"published".equalsIgnoreCase(listing.getStatus())) {
+        if (!isPublic(listing.getStatus())) {
             throw new IllegalArgumentException("Listing not found: " + id);
         }
 
@@ -155,14 +207,15 @@ public class ListingService {
             listing.getViews(),
             listing.getDescription(),
             buildFeatures(listing),
-            buildSpecs(listing)
+            buildSpecs(listing),
+            listing.getAvailability()
         );
     }
 
     public HomeResponse getHomePage() {
         List<Listing> all = listingRepository.findAll();
         List<ListingResponse> featured = all.stream()
-            .filter(item -> "published".equalsIgnoreCase(item.getStatus()))
+            .filter(item -> isPublic(item.getStatus()))
             .filter(item -> Boolean.TRUE.equals(item.getFeatured()))
             .sorted(Comparator.comparing(Listing::getCreatedAt).reversed())
             .limit(4)
@@ -170,7 +223,7 @@ public class ListingService {
             .toList();
 
         List<ListingResponse> latest = all.stream()
-            .filter(item -> "published".equalsIgnoreCase(item.getStatus()))
+            .filter(item -> isPublic(item.getStatus()))
             .sorted(Comparator.comparing(Listing::getCreatedAt).reversed())
             .limit(6)
             .map(this::toResponse)
@@ -220,8 +273,14 @@ public class ListingService {
             listing.getSellerRating(),
             listing.getFeatured(),
             listing.getViews(),
-            listing.getCreatedAt()
+            listing.getCreatedAt(),
+            listing.getAvailability(),
+            listing.getDescription()
         );
+    }
+
+    private String clean(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private boolean containsIgnoreCase(String value, String query) {

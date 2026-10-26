@@ -4,6 +4,7 @@ import com.speedshift.api.dto.ListingDtos.CreateListingRequest;
 import com.speedshift.api.dto.ListingDtos.HomeResponse;
 import com.speedshift.api.dto.ListingDtos.ListingDetailResponse;
 import com.speedshift.api.dto.ListingDtos.ListingResponse;
+import com.speedshift.api.dto.ListingDtos.ListingStatusRequest;
 import com.speedshift.api.service.ListingService;
 import com.speedshift.api.entity.User;
 import jakarta.validation.Valid;
@@ -64,6 +65,24 @@ public class ListingController {
         @AuthenticationPrincipal User seller
     ) {
         return ResponseEntity.ok(listingService.createListing(request, seller));
+    }
+
+    @PutMapping("/listings/{id}")
+    public ResponseEntity<ListingResponse> updateListing(
+        @PathVariable Long id,
+        @Valid @RequestBody CreateListingRequest request,
+        @AuthenticationPrincipal User actor
+    ) {
+        return ResponseEntity.ok(listingService.updateListing(id, request, actor));
+    }
+
+    @PatchMapping("/listings/{id}/status")
+    public ResponseEntity<ListingResponse> updateListingStatus(
+        @PathVariable Long id,
+        @Valid @RequestBody ListingStatusRequest request,
+        @AuthenticationPrincipal User actor
+    ) {
+        return ResponseEntity.ok(listingService.updateListingStatus(id, request.status(), actor));
     }
 
     @GetMapping("/listings/{id}")

@@ -29,7 +29,6 @@ public class Listing {
 
     private String subcategory;
 
-    @Column(nullable = false)
     private String brand;
 
     private String model;
@@ -51,6 +50,7 @@ public class Listing {
     private Integer enginePower;
     private Integer engineDisplacement;
     private String status;
+    private String availability;
     private String sellerName;
     private String sellerPhone;
     private Long sellerId;

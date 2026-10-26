@@ -61,6 +61,33 @@ export async function deleteMyListing(id: number) {
   return request<void>(`/listings/${id}`, { method: 'DELETE' });
 }
 
+export async function updateListingStatus(id: number, status: 'PUBLISHED' | 'RESERVED' | 'SOLD') {
+  return request<any>(`/listings/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+}
+
+export async function uploadImage(blob: Blob): Promise<{ url: string; thumbnailUrl: string }> {
+  const token = useAuthStore.getState().user?.token;
+  const body = new FormData();
+  body.append('file', blob, 'photo.jpg');
+  const response = await fetch(`${API_BASE}/uploads`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body
+  });
+  if (!response.ok) throw new Error('Échec de l’envoi d’une photo.');
+  return response.json();
+}
+
+const ASSET_ORIGIN = /^https?:\/\//.test(API_BASE) ? new URL(API_BASE).origin : '';
+
+export function assetUrl(src: string) {
+  return src.startsWith('/uploads/') ? `${ASSET_ORIGIN}${src}` : src;
+}
+
+export function thumbUrl(src: string) {
+  return assetUrl(src.startsWith('/uploads/') && !src.startsWith('/uploads/thumbs/') ? src.replace('/uploads/', '/uploads/thumbs/') : src);
+}
+
 export async function getPendingListings() {
   return request<any[]>('/admin/listings/pending');
 }
@@ -113,20 +140,28 @@ export async function createListing(payload: CreateListingPayload) {
   });
 }
 
+export async function updateListing(id: number, payload: CreateListingPayload) {
+  return request<any>(`/listings/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
 export type CreateListingPayload = {
   title: string;
   category: string;
   subcategory?: string;
-  brand: string;
+  brand?: string;
   model?: string;
   year?: number;
   mileage?: number;
   fuel?: string;
   transmission?: string;
-  city: string;
+  city?: string;
   price: number;
   imageUrl?: string;
   description?: string;
+  availability?: string;
 };
 
 export type AdminDashboardStats = {
@@ -168,4 +203,9 @@ export type AdminListing = {
   imageUrl: string | null;
   description: string | null;
   createdAt: string | null;
+  year?: number | null;
+  mileage?: number | null;
+  availability?: string | null;
+  fuel?: string | null;
+  transmission?: string | null;
 };

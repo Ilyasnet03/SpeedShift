@@ -13,6 +13,7 @@ frontend/vite.config.d.ts
 
 # Backend
 backend/target/
+backend/uploads/
 
 # IDE and operating system
 .idea/
