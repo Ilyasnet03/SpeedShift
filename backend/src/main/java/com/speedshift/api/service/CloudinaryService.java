@@ -39,10 +39,10 @@ public class CloudinaryService {
         @Value("${app.cloudinary.api-secret:}") String apiSecret,
         @Value("${app.cloudinary.folder:speedshift}") String folder
     ) {
-        this.cloudName = cloudName;
-        this.apiKey = apiKey;
-        this.apiSecret = apiSecret;
-        this.folder = folder;
+        this.cloudName = cloudName.trim();
+        this.apiKey = apiKey.trim();
+        this.apiSecret = apiSecret.trim();
+        this.folder = folder.trim();
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(10_000);
         factory.setReadTimeout(30_000);
@@ -85,8 +85,11 @@ public class CloudinaryService {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Réponse Cloudinary invalide.");
             }
             return secureUrl.asText();
+        } catch (org.springframework.web.client.HttpStatusCodeException exception) {
+            logger.warn("Cloudinary image upload failed: HTTP {} - {}", exception.getStatusCode().value(), exception.getResponseBodyAsString());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Échec de l'envoi de l'image vers Cloudinary.");
         } catch (RestClientException | java.io.IOException exception) {
-            logger.warn("Cloudinary image upload failed", exception);
+            logger.warn("Cloudinary image upload failed: {}", String.valueOf(exception.getMessage()));
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Échec de l'envoi de l'image vers Cloudinary.");
         }
     }
