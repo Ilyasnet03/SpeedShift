@@ -33,6 +33,7 @@ import {
   getAdminListings,
   getAdminStats,
   getAdminUsers,
+  deleteAdminUser,
   getHome,
   getListing,
   getListings,
@@ -1413,6 +1414,7 @@ function LoginPage() {
 }
 
 function AdminPage() {
+  const currentUserEmail = useAuthStore((state) => state.user?.email);
   const queryClient = useQueryClient();
   const [section, setSection] = useState<'stats' | 'users' | 'listings'>('stats');
   const [search, setSearch] = useState('');
@@ -1440,12 +1442,16 @@ function AdminPage() {
     mutationFn: ({ id, role }: { id: number; role: 'CLIENT' | 'ADMIN' }) => setAdminUserRole(id, role),
     onSuccess: refreshAdminData
   });
+  const deleteUserMutation = useMutation({
+    mutationFn: deleteAdminUser,
+    onSuccess: refreshAdminData
+  });
   const listingMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: AdminListingStatus }) => setAdminListingStatus(id, status),
     onSuccess: refreshAdminData
   });
 
-  const mutationError = enabledMutation.isError || roleMutation.isError || listingMutation.isError;
+  const mutationError = enabledMutation.isError || roleMutation.isError || deleteUserMutation.isError || listingMutation.isError;
   const tabClass = (tab: typeof section) =>
     `rounded-full px-5 py-3 text-sm font-medium transition ${section === tab ? 'bg-ember text-white' : 'border border-white/10 bg-white/5 text-stone hover:text-white'}`;
 
@@ -1518,6 +1524,15 @@ function AdminPage() {
                         <button type="button" disabled={roleMutation.isPending} onClick={() => roleMutation.mutate({ id: user.id, role: user.role === 'ADMIN' ? 'CLIENT' : 'ADMIN' })} className="rounded-full border border-ember/40 px-3 py-2 text-xs text-white disabled:opacity-50">
                           {user.role === 'ADMIN' ? 'Retirer admin' : 'Rendre admin'}
                         </button>
+                        {user.email !== currentUserEmail && (
+                          <button type="button" disabled={deleteUserMutation.isPending} onClick={() => {
+                            if (window.confirm(`Supprimer définitivement le compte de ${user.firstName} ${user.lastName} ? Ses annonces resteront publiées sans propriétaire associé.`)) {
+                              deleteUserMutation.mutate(user.id);
+                            }
+                          }} className="rounded-full border border-red-500/40 px-3 py-2 text-xs text-red-400 disabled:opacity-50">
+                            Supprimer
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

@@ -99,6 +99,19 @@ public class AdminService {
         return toUserSummary(userRepository.save(user));
     }
 
+    @Transactional
+    public void deleteUser(Long id, User actor) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur introuvable."));
+        if (actor.getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Vous ne pouvez pas supprimer votre propre compte administrateur.");
+        }
+        if (isLastEnabledAdmin(user)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Le dernier administrateur actif ne peut pas être supprimé.");
+        }
+        userRepository.delete(user);
+    }
+
     public List<ListingSummary> getListings() {
         return listingRepository.findAll().stream()
             .sorted(Comparator.comparing(Listing::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))

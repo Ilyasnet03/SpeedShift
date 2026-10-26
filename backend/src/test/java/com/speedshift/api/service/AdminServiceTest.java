@@ -46,6 +46,39 @@ class AdminServiceTest {
     }
 
     @Test
+    void deletesOtherUsers() {
+        User client = user(3L, Role.CLIENT, true);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(client));
+
+        adminService.deleteUser(3L, user(1L, Role.ADMIN, true));
+
+        verify(userRepository).delete(client);
+    }
+
+    @Test
+    void preventsDeletingOwnAccount() {
+        User admin = user(1L, Role.ADMIN, true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+            () -> adminService.deleteUser(1L, admin));
+
+        verify(userRepository, never()).delete(any(User.class));
+    }
+
+    @Test
+    void preventsDeletingTheLastEnabledAdmin() {
+        User admin = user(2L, Role.ADMIN, true);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(admin));
+        when(userRepository.countByRoleAndEnabled(Role.ADMIN, true)).thenReturn(1L);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+            () -> adminService.deleteUser(2L, user(1L, Role.ADMIN, true)));
+
+        verify(userRepository, never()).delete(any(User.class));
+    }
+
+    @Test
     void storesAdminListingStatusInLowercase() {
         Listing listing = Listing.builder()
             .id(7L)

@@ -142,6 +142,10 @@ export async function setAdminUserRole(id: number, role: 'CLIENT' | 'ADMIN') {
   });
 }
 
+export async function deleteAdminUser(id: number) {
+  return request<void>(`/admin/users/${id}`, { method: 'DELETE' });
+}
+
 export async function getAdminListings() {
   return request<AdminListing[]>('/admin/listings');
 }

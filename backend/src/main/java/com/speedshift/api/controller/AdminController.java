@@ -55,6 +55,11 @@ public class AdminController {
         return adminService.setUserRole(id, Role.valueOf(request.role()), actor);
     }
 
+    @DeleteMapping("/users/{id}")
+    public void deleteUser(@PathVariable Long id, @AuthenticationPrincipal User actor) {
+        adminService.deleteUser(id, actor);
+    }
+
     @GetMapping("/listings")
     public List<ListingSummary> getListings() {
         return adminService.getListings();
