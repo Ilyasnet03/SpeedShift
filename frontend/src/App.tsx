@@ -1038,19 +1038,20 @@ function SellPage() {
       setPhotoError(error instanceof Error ? error.message : 'Impossible de traiter les photos sélectionnées.');
       return;
     }
+    const isPartsCategory = form.category === PARTS_CATEGORY;
     mutation.mutate({
       title: form.title.trim(),
       category: form.category,
       brand: form.brand.trim() || undefined,
       model: form.model.trim() || undefined,
-      year: form.year ? Number(form.year) : undefined,
-      mileage: form.mileage ? Number(form.mileage) : undefined,
+      year: !isPartsCategory && form.year ? Number(form.year) : undefined,
+      mileage: !isPartsCategory && form.mileage ? Number(form.mileage) : undefined,
       city: form.city.trim() || undefined,
       price: Number(form.price),
       imageUrl,
       description: form.description.trim() || undefined,
-      fuel: form.fuel || undefined,
-      transmission: form.transmission || undefined,
+      fuel: !isPartsCategory ? form.fuel || undefined : undefined,
+      transmission: !isPartsCategory ? form.transmission || undefined : undefined,
       availability: form.category === PARTS_CATEGORY ? form.availability : undefined
     });
   };
@@ -1084,6 +1085,7 @@ function SellPage() {
         <label className="space-y-2 text-sm text-stone">Modèle
           <input maxLength={100} value={form.model} onChange={(event) => updateField('model', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
+        {form.category !== PARTS_CATEGORY && (<>
         <label className="space-y-2 text-sm text-stone">Année
           <input type="number" min="1900" max="2100" value={form.year} onChange={(event) => updateField('year', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
@@ -1102,6 +1104,7 @@ function SellPage() {
         <label className="space-y-2 text-sm text-stone">Kilométrage
           <input type="number" min="0" value={form.mileage} onChange={(event) => updateField('mileage', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
+        </>)}
         <label className="space-y-2 text-sm text-stone">Prix (DH) *
           <input required type="number" min="0.01" step="0.01" value={form.price} onChange={(event) => updateField('price', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
@@ -1175,20 +1178,22 @@ function MyListingsPage() {
             <Link to="/sell" className="mt-4 inline-flex rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Publier une annonce</Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:gap-5">
+          <div className="flex flex-col gap-3">
             {listingsQuery.data.map((listing) => (
-              <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
-                {getListingFirstImage(listing.imageUrl) && <img src={thumbUrl(getListingFirstImage(listing.imageUrl)!)} alt="" className="aspect-square w-full object-cover" />}
-                <div className="space-y-3 p-5">
+              <article key={listing.id} className="flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#121416] sm:flex-row sm:items-center">
+                {getListingFirstImage(listing.imageUrl) && <img src={thumbUrl(getListingFirstImage(listing.imageUrl)!)} alt="" className="h-48 w-full object-cover sm:h-40 sm:w-48 sm:shrink-0" />}
+                <div className="flex-1 space-y-2 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <h2 className="font-display text-2xl uppercase text-white">{listing.title}</h2>
-                    <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{statusLabels[String(listing.status).toLowerCase()] ?? listing.status}</span>
+                    <h2 className="font-display text-xl uppercase text-white">{listing.title}</h2>
+                    <span className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{statusLabels[String(listing.status).toLowerCase()] ?? listing.status}</span>
                   </div>
                   <p className="text-sm text-stone">{[listing.brand, listing.model, listing.city].filter(Boolean).join(' · ')}</p>
                   <p className="font-display text-2xl text-ember">{formatPrice(listing.price)}</p>
                   <AvailabilityBadge value={listing.availability} />
+                </div>
+                <div className="space-y-2 p-4 sm:w-60 sm:shrink-0">
                   {['published', 'reserved', 'sold'].includes(String(listing.status).toLowerCase()) && (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2">
                       {String(listing.status).toLowerCase() !== 'published' && <button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: listing.id, status: 'PUBLISHED' })} className="rounded-full border border-emerald-500/40 px-3 py-2 text-xs text-emerald-500 disabled:opacity-50">Remettre en vente</button>}
                       {String(listing.status).toLowerCase() === 'published' && <button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: listing.id, status: 'RESERVED' })} className="rounded-full border border-amber-500/40 px-3 py-2 text-xs text-amber-500 disabled:opacity-50">Marquer réservé</button>}
                       {String(listing.status).toLowerCase() !== 'sold' && <button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: listing.id, status: 'SOLD' })} className="rounded-full border border-white/20 px-3 py-2 text-xs text-white disabled:opacity-50">Marquer vendu</button>}
@@ -1534,22 +1539,24 @@ function AdminPage() {
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher une annonce, un vendeur…" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white placeholder:text-stone/50 sm:max-w-sm" />
           </div>
           {listingsQuery.isLoading ? <LoadingPanel /> : listingsQuery.isError || !listingsQuery.data ? <ErrorPanel error={listingsQuery.error} onRetry={() => listingsQuery.refetch()} /> : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="flex flex-col gap-3">
               {listingsQuery.data.filter((listing) => `${listing.title} ${listing.category} ${listing.brand ?? ''} ${listing.model ?? ''} ${listing.sellerName ?? ''} ${listing.city ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((listing) => {
                 const image = getListingFirstImage(listing.imageUrl);
                 return (
-                  <article key={listing.id} className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
-                    {image && <img src={image} alt="" className="aspect-square w-full object-cover" />}
-                    <div className="space-y-3 p-5">
-                      <div className="flex items-center justify-between gap-2">
+                  <article key={listing.id} className="flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#121416] sm:flex-row sm:items-center">
+                    {image && <img src={image} alt="" className="h-48 w-full object-cover sm:h-44 sm:w-52 sm:shrink-0" />}
+                    <div className="flex-1 space-y-2 p-4">
+                      <div className="flex items-center gap-3">
                         <span className="text-xs uppercase tracking-[0.2em] text-ember">{listing.category}</span>
                         <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{listing.status}</span>
                       </div>
-                      <h3 className="font-display text-2xl uppercase text-white">{listing.title}</h3>
+                      <h3 className="font-display text-xl uppercase text-white">{listing.title}</h3>
                       <p className="text-sm text-stone">{[listing.brand, listing.model, listing.city].filter(Boolean).join(' · ')}</p>
                       <p className="text-sm text-stone">{formatPrice(listing.price)} · {listing.sellerName ?? 'Vendeur inconnu'}</p>
-                      <p className="line-clamp-3 text-sm text-stone/70">{listing.description ?? 'Aucune description.'}</p>
-                      <label className="block space-y-2 text-xs text-stone/70">Statut de l’annonce
+                      <p className="line-clamp-2 text-sm text-stone/70">{listing.description ?? 'Aucune description.'}</p>
+                    </div>
+                    <div className="space-y-2 p-4 sm:w-60 sm:shrink-0">
+                      <label className="block space-y-1 text-xs text-stone/70">Statut de l’annonce
                         <select value={(listing.status ?? 'pending').toUpperCase()} disabled={listingMutation.isPending} onChange={(event) => listingMutation.mutate({ id: listing.id, status: event.target.value as AdminListingStatus })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white disabled:opacity-50">
                           <option value="PENDING">En attente</option>
                           <option value="PUBLISHED">Publiée</option>
