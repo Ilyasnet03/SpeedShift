@@ -44,17 +44,14 @@ Le backend attend PostgreSQL sur `localhost:5432` par défaut. Le profil `test` 
 
 Le fichier `render.yaml` configure le frontend comme site statique gratuit et l'API comme service web Docker gratuit. Le frontend appelle l'API publique ; le backend n'autorise que l'origine du frontend configurée.
 
-Render ne fournit pas de base PostgreSQL gratuite permanente. Pour garder le déploiement gratuit, créez une base PostgreSQL chez un fournisseur avec une offre gratuite, par exemple [Neon](https://neon.tech/), puis :
+Le Blueprint crée également une base PostgreSQL gratuite Render ; aucune URL ni aucun mot de passe de base de données n'est à saisir manuellement. **Attention : les bases PostgreSQL gratuites Render expirent après 30 jours.** Pour des données durables, utilisez une base payante ou configurez un fournisseur externe.
 
 1. Sur Render, sélectionnez **New + → Blueprint** et connectez le dépôt GitHub `Ilyasnet03/SpeedShift`.
-2. Pendant la synchronisation du Blueprint, renseignez les variables demandées pour l'API :
-   - `SPRING_DATASOURCE_URL` : URL JDBC, par exemple `jdbc:postgresql://<hôte-neon>/<base>?sslmode=require` (utilisez l'hôte et la base indiqués par Neon).
-   - `SPRING_DATASOURCE_USERNAME` : utilisateur PostgreSQL Neon.
-   - `SPRING_DATASOURCE_PASSWORD` : mot de passe PostgreSQL Neon.
-3. Laissez Render générer `JWT_SECRET`, puis créez les services.
-4. Ouvrez le site statique `speedshift-web` une fois les deux déploiements terminés.
+2. Vérifiez la liste des ressources gratuites (API, site statique, base PostgreSQL), puis sélectionnez **Apply** ou **Deploy Blueprint**.
+3. Render génère `JWT_SECRET` et renseigne automatiquement les paramètres de connexion à PostgreSQL.
+4. Ouvrez le site statique `speedshift-web` une fois les déploiements terminés.
 
-Les services gratuits Render peuvent se mettre en veille après une période d'inactivité. Le premier appel à l'API peut donc prendre un moment. Les offres gratuites des fournisseurs de bases de données ont également leurs propres limites et conditions. Si Render attribue des sous-domaines différents, mettez à jour `VITE_API_BASE_URL` et `FRONTEND_URL` dans `render.yaml` avec les URL affichées dans le tableau de bord, puis redéployez.
+Les services web gratuits Render peuvent se mettre en veille après une période d'inactivité. Le premier appel à l'API peut donc prendre un moment. Si Render attribue des sous-domaines différents, mettez à jour `VITE_API_BASE_URL` et `FRONTEND_URL` dans `render.yaml`, puis redéployez.
 
 ## Fonctionnalités de démonstration incluses
 

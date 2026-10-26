@@ -7,12 +7,26 @@ services:
     plan: free
     healthCheckPath: /api/health
     envVars:
-      - key: SPRING_DATASOURCE_URL
-        sync: false
-      - key: SPRING_DATASOURCE_USERNAME
-        sync: false
-      - key: SPRING_DATASOURCE_PASSWORD
-        sync: false
+      - key: DB_HOST
+        fromDatabase:
+          name: speedshift-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: speedshift-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: speedshift-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: speedshift-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: speedshift-db
+          property: password
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
@@ -22,7 +36,6 @@ services:
     name: speedshift-web
     runtime: static
     rootDir: frontend
-    region: frankfurt
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     routes:
@@ -32,3 +45,10 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         value: https://speedshift-api.onrender.com/api
+
+databases:
+  - name: speedshift-db
+    databaseName: speedshift
+    user: speedshift
+    plan: free
+    region: frankfurt

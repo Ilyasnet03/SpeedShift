@@ -2,9 +2,9 @@ spring:
   application:
     name: speedshift-api
   datasource:
-    url: jdbc:postgresql://localhost:5432/speedshift
-    username: speedshift
-    password: speedshift
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:speedshift}
+    username: ${DB_USER:speedshift}
+    password: ${DB_PASSWORD:speedshift}
     driver-class-name: org.postgresql.Driver
   flyway:
     enabled: true
