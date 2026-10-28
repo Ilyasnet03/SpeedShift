@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Gauge,
   MapPin,
+  ArrowLeft,
   Menu,
   Search,
   ShieldCheck,
@@ -842,6 +843,7 @@ function CatalogPage() {
 
 function ListingDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [activeImage, setActiveImage] = useState(0);
   const { data, isLoading, isError } = useQuery({ queryKey: ['listing', id], queryFn: () => getListing(Number(id)) });
 
@@ -855,6 +857,9 @@ function ListingDetailPage() {
 
   return (
     <div className="space-y-8">
+      <button type="button" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/catalog'))} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-stone transition hover:text-white">
+        <ArrowLeft size={16} /> Retour
+      </button>
       <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[#121416]">
         {selectedImage ? <img src={assetUrl(selectedImage)} alt={data.title} className="mx-auto aspect-square w-full max-w-[560px] object-cover" /> : <div className="flex aspect-square items-center justify-center text-stone">Aucune photo disponible</div>}
       </section>
