@@ -50,6 +50,11 @@ import {
   setAdminUserEnabled,
   setAdminUserRole,
   type AdminListingStatus,
+  type AdminListing,
+  type AdminUser,
+  type AdminDashboardStats,
+  type AdminListingView,
+  type AdminSiteVisit,
   type CreateListingPayload
 } from './services/api';
 import { useAuthStore } from './store/authStore';
@@ -1429,16 +1434,167 @@ function LoginPage() {
   );
 }
 
+function DashboardOverview({ stats, users, listings, views, visits, onModerate, onOpen }: {
+  stats: AdminDashboardStats;
+  users: AdminUser[];
+  listings: AdminListing[];
+  views: AdminListingView[];
+  visits: AdminSiteVisit[];
+  onModerate: (id: number, status: AdminListingStatus) => void;
+  onOpen: (section: 'users' | 'listings' | 'views' | 'visits') => void;
+}) {
+  const dayKey = (value: string | null) => (value ? new Date(value).toISOString().slice(0, 10) : '');
+  const today = new Date().toISOString().slice(0, 10);
+  const days = Array.from({ length: 14 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (13 - index));
+    return date.toISOString().slice(0, 10);
+  });
+  const visitsByDay = days.map((day) => visits.filter((visit) => dayKey(visit.visitedAt) === day));
+  const maxDay = Math.max(1, ...visitsByDay.map((items) => items.length));
+  const uniqueVisitors = new Set(visits.map((visit) => visit.visitorId)).size;
+  const anonymousVisitors = new Set(visits.filter((visit) => visit.userId == null).map((visit) => visit.visitorId)).size;
+  const visitsToday = visits.filter((visit) => dayKey(visit.visitedAt) === today);
+  const pending = listings.filter((listing) => listing.status === 'PENDING');
+  const admins = users.filter((user) => user.role === 'ADMIN').length;
+
+  const countBy = <T,>(items: T[], key: (item: T) => string) => {
+    const map = new Map<string, number>();
+    items.forEach((item) => map.set(key(item), (map.get(key(item)) ?? 0) + 1));
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  };
+  const byCategory = countBy(listings, (listing) => listing.category || 'Autre').slice(0, 6);
+  const byCity = countBy(listings.filter((listing) => listing.city), (listing) => listing.city as string).slice(0, 5);
+  const topViewed = countBy(views, (view) => `${view.listingId}|${view.listingTitle}`).slice(0, 5);
+  const topPages = countBy(visits, (visit) => visit.path).slice(0, 5);
+  const visitorName = (visit: AdminSiteVisit) => (visit.email ? `${visit.firstName ?? ''} ${visit.lastName ?? ''}`.trim() || visit.email : `Anonyme #${visit.visitorId.slice(0, 8)}`);
+  const fmt = (value: string | null) => (value ? new Date(value).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—');
+
+  const kpis: [string, string | number, string][] = [
+    ['Utilisateurs', stats.totalUsers, `${stats.activeUsers} actifs · ${stats.disabledUsers} suspendus · ${admins} admin`],
+    ['Nouveaux (30 j)', stats.newUsersLast30Days, 'Inscriptions récentes'],
+    ['Annonces', stats.totalListings, `${stats.publishedListings} publiées · ${stats.rejectedListings} refusées`],
+    ['À valider', stats.pendingListings, 'Annonces en attente'],
+    ['Prix moyen', formatPrice(stats.averagePublishedPrice), 'Annonces publiées'],
+    ['Visiteurs uniques', uniqueVisitors, `${anonymousVisitors} anonymes · ${visitsToday.length} visites aujourd'hui`],
+    ['Visites enregistrées', visits.length, 'Dernières 500 pages vues'],
+    ['Consultations d\'annonces', views.length, 'Par utilisateurs connectés']
+  ];
+  const card = 'rounded-[24px] border border-white/10 bg-[#121416] p-5';
+  const bar = (label: string, value: number, max: number) => (
+    <li key={label} className="space-y-1">
+      <div className="flex justify-between gap-3 text-sm text-white"><span className="truncate">{label}</span><span className="text-stone">{value}</span></div>
+      <div className="h-2 rounded-full bg-white/10"><div className="h-2 rounded-full bg-ember" style={{ width: `${(value / max) * 100}%` }} /></div>
+    </li>
+  );
+
+  return (
+    <section aria-label="Dashboard" className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {kpis.map(([label, value, hint]) => (
+          <article key={label} className={card}>
+            <h2 className="text-xs uppercase tracking-[0.2em] text-stone/70">{label}</h2>
+            <p className="mt-2 font-display text-4xl uppercase text-white">{value}</p>
+            <p className="mt-1 text-xs text-stone/70">{hint}</p>
+          </article>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <article className={`${card} lg:col-span-2`}>
+          <h2 className="font-display text-2xl uppercase text-white">Visites — 14 derniers jours</h2>
+          <div className="mt-5 flex h-40 items-end gap-2">
+            {visitsByDay.map((items, index) => (
+              <div key={days[index]} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${days[index]} : ${items.length}`}>
+                <span className="text-[10px] text-stone">{items.length}</span>
+                <div className="w-full rounded-t bg-ember" style={{ height: `${Math.max(4, (items.length / maxDay) * 100)}%` }} />
+                <span className="text-[9px] text-stone/60">{days[index].slice(8)}</span>
+              </div>
+            ))}
+          </div>
+        </article>
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Pages les plus vues</h2>
+          <ul className="mt-4 space-y-3">{topPages.length ? topPages.map(([path, n]) => bar(path, n, topPages[0][1])) : <li className="text-sm text-stone">Aucune donnée.</li>}</ul>
+        </article>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Annonces par catégorie</h2>
+          <ul className="mt-4 space-y-3">{byCategory.length ? byCategory.map(([k, n]) => bar(k, n, byCategory[0][1])) : <li className="text-sm text-stone">Aucune donnée.</li>}</ul>
+        </article>
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Annonces par ville</h2>
+          <ul className="mt-4 space-y-3">{byCity.length ? byCity.map(([k, n]) => bar(k, n, byCity[0][1])) : <li className="text-sm text-stone">Aucune donnée.</li>}</ul>
+        </article>
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Annonces les plus consultées</h2>
+          <ul className="mt-4 space-y-3">{topViewed.length ? topViewed.map(([k, n]) => bar(k.split('|')[1], n, topViewed[0][1])) : <li className="text-sm text-stone">Aucune donnée.</li>}</ul>
+        </article>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <article className={card}>
+          <div className="flex items-center justify-between"><h2 className="font-display text-2xl uppercase text-white">À modérer ({pending.length})</h2><button type="button" onClick={() => onOpen('listings')} className="text-xs uppercase tracking-[0.2em] text-ember">Tout voir</button></div>
+          <ul className="mt-4 space-y-3">
+            {pending.slice(0, 5).map((listing) => (
+              <li key={listing.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-3">
+                <div className="min-w-0"><Link to={`/listing/${listing.id}`} className="block truncate text-sm text-white hover:text-ember">{listing.title}</Link><span className="text-xs text-stone">{listing.sellerName ?? '—'} · {formatPrice(listing.price)}</span></div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => onModerate(listing.id, 'PUBLISHED')} className="rounded-full bg-ember px-3 py-1 text-xs text-white">Publier</button>
+                  <button type="button" onClick={() => onModerate(listing.id, 'REJECTED')} className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone hover:text-white">Refuser</button>
+                </div>
+              </li>
+            ))}
+            {pending.length === 0 && <li className="text-sm text-stone">Aucune annonce en attente.</li>}
+          </ul>
+        </article>
+        <article className={card}>
+          <div className="flex items-center justify-between"><h2 className="font-display text-2xl uppercase text-white">Derniers inscrits</h2><button type="button" onClick={() => onOpen('users')} className="text-xs uppercase tracking-[0.2em] text-ember">Tout voir</button></div>
+          <ul className="mt-4 space-y-3">
+            {[...users].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')).slice(0, 5).map((user) => (
+              <li key={user.id} className="flex justify-between gap-3 text-sm"><span className="truncate text-white">{user.firstName} {user.lastName} <span className="text-stone">· {user.email}</span></span><span className="shrink-0 text-xs text-stone">{fmt(user.createdAt)}</span></li>
+            ))}
+            {users.length === 0 && <li className="text-sm text-stone">Aucun utilisateur.</li>}
+          </ul>
+        </article>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <article className={card}>
+          <div className="flex items-center justify-between"><h2 className="font-display text-2xl uppercase text-white">Activité des visiteurs</h2><button type="button" onClick={() => onOpen('visits')} className="text-xs uppercase tracking-[0.2em] text-ember">Tout voir</button></div>
+          <ul className="mt-4 space-y-3">
+            {visits.slice(0, 6).map((visit) => (
+              <li key={visit.id} className="flex justify-between gap-3 text-sm"><span className="truncate text-white">{visitorName(visit)} <span className="text-stone">· {visit.path}</span></span><span className="shrink-0 text-xs text-stone">{fmt(visit.visitedAt)}</span></li>
+            ))}
+            {visits.length === 0 && <li className="text-sm text-stone">Aucune visite.</li>}
+          </ul>
+        </article>
+        <article className={card}>
+          <div className="flex items-center justify-between"><h2 className="font-display text-2xl uppercase text-white">Dernières consultations</h2><button type="button" onClick={() => onOpen('views')} className="text-xs uppercase tracking-[0.2em] text-ember">Tout voir</button></div>
+          <ul className="mt-4 space-y-3">
+            {views.slice(0, 6).map((view) => (
+              <li key={view.id} className="flex justify-between gap-3 text-sm"><span className="truncate text-white">{view.firstName} {view.lastName} <span className="text-stone">→ {view.listingTitle}</span></span><span className="shrink-0 text-xs text-stone">{fmt(view.viewedAt)}</span></li>
+            ))}
+            {views.length === 0 && <li className="text-sm text-stone">Aucune consultation.</li>}
+          </ul>
+        </article>
+      </div>
+    </section>
+  );
+}
+
 function AdminPage() {
   const currentUserEmail = useAuthStore((state) => state.user?.email);
   const queryClient = useQueryClient();
   const [section, setSection] = useState<'stats' | 'users' | 'listings' | 'views' | 'visits'>('stats');
-  const visitsQuery = useQuery({ queryKey: ['admin', 'visits'], queryFn: getAdminSiteVisits, enabled: section === 'visits' });
+  const visitsQuery = useQuery({ queryKey: ['admin', 'visits'], queryFn: getAdminSiteVisits, enabled: section === 'visits' || section === 'stats' });
   const [search, setSearch] = useState('');
-  const viewsQuery = useQuery({ queryKey: ['admin', 'views'], queryFn: getAdminListingViews, enabled: section === 'views' });
+  const viewsQuery = useQuery({ queryKey: ['admin', 'views'], queryFn: getAdminListingViews, enabled: section === 'views' || section === 'stats' });
   const statsQuery = useQuery({ queryKey: ['admin', 'stats'], queryFn: getAdminStats, enabled: section === 'stats' });
-  const usersQuery = useQuery({ queryKey: ['admin', 'users'], queryFn: getAdminUsers, enabled: section === 'users' });
-  const listingsQuery = useQuery({ queryKey: ['admin', 'listings'], queryFn: getAdminListings, enabled: section === 'listings' });
+  const usersQuery = useQuery({ queryKey: ['admin', 'users'], queryFn: getAdminUsers, enabled: section === 'users' || section === 'stats' });
+  const listingsQuery = useQuery({ queryKey: ['admin', 'listings'], queryFn: getAdminListings, enabled: section === 'listings' || section === 'stats' });
 
   const refreshAdminData = async () => {
     await Promise.all([
@@ -1482,7 +1638,7 @@ function AdminPage() {
       </div>
 
       <nav aria-label="Sections du dashboard" className="flex flex-wrap gap-3">
-        <button type="button" className={tabClass('stats')} onClick={() => { setSection('stats'); setSearch(''); }}>Statistiques</button>
+        <button type="button" className={tabClass('stats')} onClick={() => { setSection('stats'); setSearch(''); }}>Dashboard</button>
         <button type="button" className={tabClass('users')} onClick={() => { setSection('users'); setSearch(''); }}>Utilisateurs</button>
         <button type="button" className={tabClass('listings')} onClick={() => { setSection('listings'); setSearch(''); }}>Annonces</button>
         <button type="button" className={tabClass('views')} onClick={() => { setSection('views'); setSearch(''); }}>Consultations</button>
@@ -1493,24 +1649,15 @@ function AdminPage() {
 
       {section === 'stats' && (
         statsQuery.isLoading ? <LoadingPanel /> : statsQuery.isError || !statsQuery.data ? <ErrorPanel error={statsQuery.error} onRetry={() => statsQuery.refetch()} /> : (
-          <section aria-label="Statistiques de la marketplace" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {[
-              ['Utilisateurs inscrits', statsQuery.data.totalUsers],
-              ['Comptes actifs', statsQuery.data.activeUsers],
-              ['Comptes suspendus', statsQuery.data.disabledUsers],
-              ['Nouveaux comptes (30 jours)', statsQuery.data.newUsersLast30Days],
-              ['Toutes les annonces', statsQuery.data.totalListings],
-              ['Annonces publiées', statsQuery.data.publishedListings],
-              ['En attente de validation', statsQuery.data.pendingListings],
-              ['Annonces refusées', statsQuery.data.rejectedListings],
-              ['Prix moyen publié', formatPrice(statsQuery.data.averagePublishedPrice)]
-            ].map(([label, value]) => (
-              <article key={String(label)} className="rounded-[24px] border border-white/10 bg-[#121416] p-6">
-                <h2 className="text-xs uppercase tracking-[0.2em] text-stone/70">{String(label)}</h2>
-                <p className="mt-3 font-display text-4xl uppercase text-white">{String(value)}</p>
-              </article>
-            ))}
-          </section>
+          <DashboardOverview
+            stats={statsQuery.data}
+            users={usersQuery.data ?? []}
+            listings={listingsQuery.data ?? []}
+            views={viewsQuery.data ?? []}
+            visits={visitsQuery.data ?? []}
+            onModerate={(id, status) => listingMutation.mutate({ id, status })}
+            onOpen={setSection}
+          />
         )
       )}
 
