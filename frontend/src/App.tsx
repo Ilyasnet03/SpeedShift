@@ -731,7 +731,12 @@ function CatalogPage() {
     if (filters.availability && item.availability !== filters.availability) return false;
     return true;
   };
-  const filtered = data.filter(matches);
+  const isRecent = (item: any) => item.createdAt && Date.now() - new Date(item.createdAt).getTime() < 24 * 60 * 60 * 1000;
+  const filtered = data.filter(matches).sort((a: any, b: any) => {
+    if (sort !== 'featured') return 0;
+    return Number(isRecent(b) ? 1 : 0) - Number(isRecent(a) ? 1 : 0) || (isRecent(a) && isRecent(b) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0);
+  });
+  const recentCount = filtered.filter(isRecent).length;
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const filterInput = 'w-full rounded-xl border border-white/10 bg-black/20 p-3 text-white placeholder:text-stone/60';
 
@@ -829,6 +834,11 @@ function CatalogPage() {
               <option value="popular">Populaires</option>
             </select>
           </div>
+          {sort === 'featured' && recentCount > 0 && (
+            <p className="flex items-center gap-2 rounded-[24px] border border-ember/40 bg-ember/10 px-4 py-3 text-sm text-white">
+              <Zap size={16} className="text-ember" /> Annonces récentes affichées en premier — {recentCount} publiée{recentCount > 1 ? 's' : ''} il y a moins de 24 h
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
             {filtered.map((item: any) => (
               <ListingCard key={item.id} listing={item} compact />
