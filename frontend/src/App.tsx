@@ -695,6 +695,8 @@ function CatalogPage() {
   const category = searchParams.get('category') ?? undefined;
   const [query, setQuery] = useState(searchParams.get('query') ?? '');
   const [city, setCity] = useState(searchParams.get('city') ?? '');
+  const appliedQuery = searchParams.get('query') ?? '';
+  const appliedCity = searchParams.get('city') ?? '';
   const [sort, setSort] = useState('featured');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const emptyFilters = { priceMin: '', priceMax: '', yearMin: '', yearMax: '', mileageMax: '', fuel: '', transmission: '', availability: '' };
@@ -702,8 +704,8 @@ function CatalogPage() {
   const setFilter = (field: keyof typeof emptyFilters, value: string) => setFilters((previous) => ({ ...previous, [field]: value }));
 
   const { data, isLoading } = useQuery({
-    queryKey: ['listings', { category, query, city, sort }],
-    queryFn: () => getListings(category, city, query, sort)
+    queryKey: ['listings', { category, query: appliedQuery, city: appliedCity, sort }],
+    queryFn: () => getListings(category, appliedCity, appliedQuery, sort)
   });
 
   if (isLoading || !data) {
