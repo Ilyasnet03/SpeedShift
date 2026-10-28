@@ -50,6 +50,29 @@ public final class AdminDtos {
         LocalDateTime createdAt
     ) {}
 
+    public record ListingViewSummary(
+        Long id,
+        Long listingId,
+        String listingTitle,
+        Long userId,
+        String firstName,
+        String lastName,
+        String email,
+        LocalDateTime viewedAt
+    ) {}
+
+    public record SiteVisitSummary(
+        Long id,
+        String visitorId,
+        Long userId,
+        String firstName,
+        String lastName,
+        String email,
+        String path,
+        String userAgent,
+        LocalDateTime visitedAt
+    ) {}
+
     public record EnabledUpdate(@NotNull Boolean enabled) {}
 
     public record RoleUpdate(

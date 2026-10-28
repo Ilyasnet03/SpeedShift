@@ -4,7 +4,12 @@ import com.speedshift.api.dto.AdminDtos.DashboardStats;
 import com.speedshift.api.dto.AdminDtos.EnabledUpdate;
 import com.speedshift.api.dto.AdminDtos.ListingStatusUpdate;
 import com.speedshift.api.dto.AdminDtos.ListingSummary;
+import com.speedshift.api.dto.AdminDtos.ListingViewSummary;
 import com.speedshift.api.dto.AdminDtos.RoleUpdate;
+import com.speedshift.api.dto.AdminDtos.SiteVisitSummary;
+import com.speedshift.api.repository.SiteVisitRepository;
+import com.speedshift.api.repository.ListingViewRepository;
+import org.springframework.data.domain.PageRequest;
 import com.speedshift.api.dto.AdminDtos.UserSummary;
 import com.speedshift.api.entity.User;
 import com.speedshift.api.entity.User.Role;
@@ -23,8 +28,24 @@ public class AdminController {
 
     private final AdminService adminService;
 
-    public AdminController(AdminService adminService) {
+    private final ListingViewRepository listingViewRepository;
+
+    private final SiteVisitRepository siteVisitRepository;
+
+    public AdminController(AdminService adminService, ListingViewRepository listingViewRepository, SiteVisitRepository siteVisitRepository) {
         this.adminService = adminService;
+        this.listingViewRepository = listingViewRepository;
+        this.siteVisitRepository = siteVisitRepository;
+    }
+
+    @GetMapping("/visits")
+    public List<SiteVisitSummary> getSiteVisits() {
+        return siteVisitRepository.findRecent(PageRequest.of(0, 500));
+    }
+
+    @GetMapping("/views")
+    public List<ListingViewSummary> getListingViews() {
+        return listingViewRepository.findRecent(PageRequest.of(0, 500));
     }
 
     @GetMapping("/stats")

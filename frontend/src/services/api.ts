@@ -149,6 +149,51 @@ export async function deleteAdminUser(id: number) {
   return request<void>(`/admin/users/${id}`, { method: 'DELETE' });
 }
 
+export async function getAdminSiteVisits() {
+  return request<AdminSiteVisit[]>('/admin/visits');
+}
+
+export type AdminSiteVisit = {
+  id: number;
+  visitorId: string;
+  userId: number | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  path: string;
+  userAgent: string | null;
+  visitedAt: string;
+};
+
+export function trackVisit(path: string) {
+  let visitorId = localStorage.getItem('speedshift-visitor');
+  if (!visitorId) {
+    visitorId = crypto.randomUUID();
+    localStorage.setItem('speedshift-visitor', visitorId);
+  }
+  const token = useAuthStore.getState().user?.token;
+  void fetch(`${API_BASE}/public/visits`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ visitorId, path })
+  }).catch(() => undefined);
+}
+
+export async function getAdminListingViews() {
+  return request<AdminListingView[]>('/admin/views');
+}
+
+export type AdminListingView = {
+  id: number;
+  listingId: number;
+  listingTitle: string;
+  userId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  viewedAt: string;
+};
+
 export async function getAdminListings() {
   return request<AdminListing[]>('/admin/listings');
 }

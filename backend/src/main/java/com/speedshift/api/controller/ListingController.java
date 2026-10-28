@@ -7,6 +7,8 @@ import com.speedshift.api.dto.ListingDtos.ListingResponse;
 import com.speedshift.api.dto.ListingDtos.ListingStatusRequest;
 import com.speedshift.api.service.ListingService;
 import com.speedshift.api.entity.User;
+import com.speedshift.api.entity.ListingView;
+import com.speedshift.api.repository.ListingViewRepository;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.ResponseEntity;
@@ -21,8 +23,11 @@ public class ListingController {
 
     private final ListingService listingService;
 
-    public ListingController(ListingService listingService) {
+    private final ListingViewRepository listingViewRepository;
+
+    public ListingController(ListingService listingService, ListingViewRepository listingViewRepository) {
         this.listingService = listingService;
+        this.listingViewRepository = listingViewRepository;
     }
 
     @GetMapping("/health")
@@ -86,8 +91,12 @@ public class ListingController {
     }
 
     @GetMapping("/listings/{id}")
-    public ResponseEntity<ListingDetailResponse> getListing(@PathVariable Long id) {
-        return ResponseEntity.ok(listingService.getListingById(id));
+    public ResponseEntity<ListingDetailResponse> getListing(@PathVariable Long id, @AuthenticationPrincipal User viewer) {
+        ListingDetailResponse detail = listingService.getListingById(id);
+        if (viewer != null) {
+            listingViewRepository.save(new ListingView(id, viewer.getId()));
+        }
+        return ResponseEntity.ok(detail);
     }
 
     @GetMapping("/admin/listings/pending")

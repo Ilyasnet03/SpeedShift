@@ -20,7 +20,7 @@ import {
   Users,
   Zap
 } from 'lucide-react';
-import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   createListing,
   updateListing,
@@ -31,6 +31,9 @@ import {
   deleteAdminListing,
   deleteMyListing,
   getAdminListings,
+  getAdminListingViews,
+  getAdminSiteVisits,
+  trackVisit,
   getAdminStats,
   getAdminUsers,
   deleteAdminUser,
@@ -110,13 +113,18 @@ const dataUrlToBlob = async (dataUrl: string) => (await fetch(dataUrl)).blob();
 
 const appNavItems = [
   { label: 'Favoris', to: '/favorites' },
-  { label: 'Catalogue', to: '/catalog' },
+  { label: 'Market', to: '/catalog' },
   { label: 'Mes annonces', to: '/my-listings' },
-  { label: 'Vendre', to: '/sell' }
+  { label: 'Poster une annonce', to: '/sell' }
 ];
 
 function App() {
   const user = useAuthStore((state) => state.user);
+  const location = useLocation();
+
+  useEffect(() => {
+    trackVisit(location.pathname);
+  }, [location.pathname]);
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     localStorage.getItem('speedshift-theme') === 'dark' ? 'dark' : 'light'
   );
@@ -131,10 +139,10 @@ function App() {
       <Header theme={theme} onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />
       <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<Navigate to="/catalog" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/marketplace" element={<Navigate to="/catalog" replace />} />
-          <Route path="/catalog" element={<RequireAuth><CatalogPage /></RequireAuth>} />
+          <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/favorites" element={<RequireAuth><FavoritesPage /></RequireAuth>} />
           <Route path="/my-listings" element={<RequireAuth><MyListingsPage /></RequireAuth>} />
           <Route path="/listing/:id" element={<RequireAuth><ListingDetailPage /></RequireAuth>} />
@@ -144,7 +152,7 @@ function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/safety" element={<SafetyPage />} />
           <Route path="/contact" element={<ContactPage />} />
-          <Route path="*" element={<Navigate to={user ? '/catalog' : '/'} replace />} />
+          <Route path="*" element={<Navigate to="/catalog" replace />} />
         </Routes>
       </main>
       <Footer />
@@ -154,9 +162,10 @@ function App() {
 
 function RequireAuth({ children, adminOnly = false }: { children: ReactNode; adminOnly?: boolean }) {
   const user = useAuthStore((state) => state.user);
+  const location = useLocation();
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   }
   if (adminOnly && user.role !== 'ADMIN') {
     return <Navigate to="/catalog" replace />;
@@ -169,7 +178,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   const { user, logout } = useAuthStore();
   const navItems = user
     ? [...appNavItems, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
-    : [];
+    : [{ label: 'Market', to: '/catalog' }];
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
@@ -183,9 +192,6 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
         </Link>
 
         <nav aria-label="Navigation principale" className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 md:flex">
-          <NavLink to="/" className={({ isActive }) => `rounded-full px-4 py-2 text-sm transition ${isActive ? 'bg-ember text-white' : 'text-stone hover:text-white'}`}>
-            Accueil
-          </NavLink>
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} className={({ isActive }) => `rounded-full px-4 py-2 text-sm transition ${isActive ? 'bg-ember text-white' : 'text-stone hover:text-white'}`}>
               {item.label}
@@ -221,7 +227,6 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
         {menuOpen && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-white/10 bg-carbon md:hidden">
             <nav aria-label="Navigation mobile" className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4">
-              <NavLink to="/" className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => setMenuOpen(false)}>Accueil</NavLink>
               {navItems.map((item) => (
                 <NavLink key={item.to} to={item.to} className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => setMenuOpen(false)}>
                   {item.label}
@@ -691,6 +696,7 @@ function CatalogPage() {
   const [query, setQuery] = useState(searchParams.get('query') ?? '');
   const [city, setCity] = useState(searchParams.get('city') ?? '');
   const [sort, setSort] = useState('featured');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const emptyFilters = { priceMin: '', priceMax: '', yearMin: '', yearMax: '', mileageMax: '', fuel: '', transmission: '', availability: '' };
   const [filters, setFilters] = useState(emptyFilters);
   const setFilter = (field: keyof typeof emptyFilters, value: string) => setFilters((previous) => ({ ...previous, [field]: value }));
@@ -727,20 +733,23 @@ function CatalogPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Recherche</div>
-            <h1 className="mt-2 font-display text-5xl uppercase text-white">Catalogue</h1>
+            <h1 className="mt-2 font-display text-5xl uppercase text-white">Market</h1>
           </div>
           <div className="flex w-full max-w-xl items-center gap-2 rounded-full border border-white/10 bg-black/20 p-2">
             <Search size={16} className="ml-2 text-stone" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); query.trim() ? next.set('query', query.trim()) : next.delete('query'); return next; }); }} placeholder="Nom, marque ou modèle…" className="w-full bg-transparent text-sm text-white placeholder:text-stone/60 focus:outline-none" />
+            <input value={query} onFocus={() => setFiltersOpen(true)} onClick={() => setFiltersOpen(true)} onChange={(e) => setQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); query.trim() ? next.set('query', query.trim()) : next.delete('query'); return next; }); }} placeholder="Nom, marque ou modèle…" className="w-full bg-transparent text-sm text-white placeholder:text-stone/60 focus:outline-none" />
             <button type="button" onClick={() => setSearchParams((previous) => { const next = new URLSearchParams(previous); query.trim() ? next.set('query', query.trim()) : next.delete('query'); return next; })} className="rounded-full bg-ember px-4 py-2 text-xs uppercase tracking-[0.2em] text-white">GO</button>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-[26px] border border-white/10 bg-[#121416] p-5">
-          <div className="mb-4 text-[10px] uppercase tracking-[0.3em] text-ember">Filtres</div>
-          <div className="space-y-4 text-sm text-stone">
+      <section className="space-y-6">
+        {filtersOpen && <aside className="rounded-[26px] border border-white/10 bg-[#121416] p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-ember">Critères de recherche</div>
+            <button type="button" onClick={() => setFiltersOpen(false)} className="text-xs uppercase tracking-[0.2em] text-stone hover:text-white">Fermer</button>
+          </div>
+          <div className="grid gap-4 text-sm text-stone sm:grid-cols-2 lg:grid-cols-3">
             <label className="block space-y-2">
               <span>Catégorie</span>
               <select value={category ?? ''} onChange={(event) => setSearchParams((previous) => { const next = new URLSearchParams(previous); event.target.value ? next.set('category', event.target.value) : next.delete('category'); return next; })} className="w-full rounded-xl border border-white/10 bg-[#0b0c0e] p-3 text-white">
@@ -799,7 +808,7 @@ function CatalogPage() {
               </button>
             )}
           </div>
-        </aside>
+        </aside>}
 
         <div className="space-y-5">
           <div className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#121416] px-4 py-3">
@@ -812,7 +821,7 @@ function CatalogPage() {
               <option value="popular">Populaires</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:gap-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
             {filtered.map((item: any) => (
               <ListingCard key={item.id} listing={item} compact />
             ))}
@@ -1063,7 +1072,7 @@ function SellPage() {
   return (
     <div className="max-w-4xl rounded-[28px] border border-white/10 bg-[#121416] p-6 md:p-10">
       <div className="mb-8">
-        <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Vendre</div>
+        <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Poster une annonce</div>
         <h1 className="mt-2 font-display text-4xl uppercase text-white sm:text-5xl">{editingId !== null ? 'Modifier mon annonce' : 'Publier une annonce'}</h1>
       </div>
 
@@ -1239,7 +1248,7 @@ function FavoritesPage() {
       {favorites.length === 0 ? (
         <div className="rounded-[24px] border border-white/10 bg-[#121416] p-10 text-center text-stone">
           Vous n’avez pas encore de favoris. Touchez le cœur d’une annonce pour la retrouver ici.
-          <Link to="/catalog" className="mt-4 inline-flex rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Parcourir le catalogue</Link>
+          <Link to="/catalog" className="mt-4 inline-flex rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Parcourir le Market</Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
@@ -1253,6 +1262,7 @@ function FavoritesPage() {
 function LoginPage() {
   const { setUser } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [form, setForm] = useState({
     firstName: '',
@@ -1275,7 +1285,8 @@ function LoginPage() {
       token: response.token,
       refreshToken: response.refreshToken
     });
-    navigate(response.role === 'ADMIN' ? '/admin' : '/catalog');
+    const from = (location.state as { from?: string } | null)?.from;
+    navigate(response.role === 'ADMIN' ? '/admin' : from && from.startsWith('/') ? from : '/catalog');
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1419,8 +1430,10 @@ function LoginPage() {
 function AdminPage() {
   const currentUserEmail = useAuthStore((state) => state.user?.email);
   const queryClient = useQueryClient();
-  const [section, setSection] = useState<'stats' | 'users' | 'listings'>('stats');
+  const [section, setSection] = useState<'stats' | 'users' | 'listings' | 'views' | 'visits'>('stats');
+  const visitsQuery = useQuery({ queryKey: ['admin', 'visits'], queryFn: getAdminSiteVisits, enabled: section === 'visits' });
   const [search, setSearch] = useState('');
+  const viewsQuery = useQuery({ queryKey: ['admin', 'views'], queryFn: getAdminListingViews, enabled: section === 'views' });
   const statsQuery = useQuery({ queryKey: ['admin', 'stats'], queryFn: getAdminStats, enabled: section === 'stats' });
   const usersQuery = useQuery({ queryKey: ['admin', 'users'], queryFn: getAdminUsers, enabled: section === 'users' });
   const listingsQuery = useQuery({ queryKey: ['admin', 'listings'], queryFn: getAdminListings, enabled: section === 'listings' });
@@ -1470,6 +1483,8 @@ function AdminPage() {
         <button type="button" className={tabClass('stats')} onClick={() => { setSection('stats'); setSearch(''); }}>Statistiques</button>
         <button type="button" className={tabClass('users')} onClick={() => { setSection('users'); setSearch(''); }}>Utilisateurs</button>
         <button type="button" className={tabClass('listings')} onClick={() => { setSection('listings'); setSearch(''); }}>Annonces</button>
+        <button type="button" className={tabClass('views')} onClick={() => { setSection('views'); setSearch(''); }}>Consultations</button>
+        <button type="button" className={tabClass('visits')} onClick={() => { setSection('visits'); setSearch(''); }}>Visiteurs</button>
       </nav>
 
       {(mutationError || deleteListingMutation.isError) && <p role="alert" className="text-sm text-red-400">Action impossible. {deleteListingMutation.error instanceof Error ? deleteListingMutation.error.message : 'Vérifiez les droits et réessayez.'}</p>}
@@ -1495,6 +1510,64 @@ function AdminPage() {
             ))}
           </section>
         )
+      )}
+
+      {section === 'visits' && (
+        <section className="space-y-5">
+          <div className="rounded-[24px] border border-white/10 bg-[#121416] p-5">
+            <h2 className="font-display text-3xl uppercase text-white">Visiteurs du site</h2>
+            <p className="text-sm text-stone/70">Toutes les visites, connectées ou anonymes (500 dernières).</p>
+          </div>
+          {visitsQuery.isLoading ? <LoadingPanel /> : visitsQuery.isError || !visitsQuery.data ? <ErrorPanel error={visitsQuery.error} onRetry={() => visitsQuery.refetch()} /> : (
+            <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-[#121416]">
+              <table className="w-full min-w-[700px] text-left text-sm">
+                <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-stone/60">
+                  <tr><th className="p-4">Date</th><th className="p-4">Visiteur</th><th className="p-4">Page</th></tr>
+                </thead>
+                <tbody>
+                  {visitsQuery.data.map((visit) => (
+                    <tr key={visit.id} className="border-b border-white/5 text-stone last:border-0">
+                      <td className="p-4">{new Date(visit.visitedAt).toLocaleString('fr-MA')}</td>
+                      <td className="p-4">
+                        {visit.userId ? <><div className="font-medium text-white">{visit.firstName} {visit.lastName}</div><div className="text-xs text-stone/60">{visit.email}</div></> : <><div className="font-medium text-white">Anonyme</div><div className="text-xs text-stone/60">#{visit.visitorId.slice(0, 8)}</div></>}
+                      </td>
+                      <td className="p-4">{visit.path}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {visitsQuery.data.length === 0 && <p className="p-6 text-center text-stone">Aucune visite pour le moment.</p>}
+            </div>
+          )}
+        </section>
+      )}
+
+      {section === 'views' && (
+        <section className="space-y-5">
+          <div className="rounded-[24px] border border-white/10 bg-[#121416] p-5">
+            <h2 className="font-display text-3xl uppercase text-white">Consultations d'annonces</h2>
+            <p className="text-sm text-stone/70">Qui a consulté quelle annonce (500 dernières).</p>
+          </div>
+          {viewsQuery.isLoading ? <LoadingPanel /> : viewsQuery.isError || !viewsQuery.data ? <ErrorPanel error={viewsQuery.error} onRetry={() => viewsQuery.refetch()} /> : (
+            <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-[#121416]">
+              <table className="w-full min-w-[700px] text-left text-sm">
+                <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-stone/60">
+                  <tr><th className="p-4">Date</th><th className="p-4">Utilisateur</th><th className="p-4">Annonce</th></tr>
+                </thead>
+                <tbody>
+                  {viewsQuery.data.map((view) => (
+                    <tr key={view.id} className="border-b border-white/5 text-stone last:border-0">
+                      <td className="p-4">{new Date(view.viewedAt).toLocaleString('fr-MA')}</td>
+                      <td className="p-4"><div className="font-medium text-white">{view.firstName} {view.lastName}</div><div className="text-xs text-stone/60">{view.email}</div></td>
+                      <td className="p-4"><Link to={`/listing/${view.listingId}`} className="text-white hover:text-ember">{view.listingTitle}</Link></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {viewsQuery.data.length === 0 && <p className="p-6 text-center text-stone">Aucune consultation pour le moment.</p>}
+            </div>
+          )}
+        </section>
       )}
 
       {section === 'users' && (
