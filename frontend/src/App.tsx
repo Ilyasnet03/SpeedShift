@@ -1,5 +1,5 @@
 import logoSpeedshift from './lib/logo-speedshift.png';
-import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -151,7 +151,7 @@ function App() {
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/favorites" element={<RequireAuth><FavoritesPage /></RequireAuth>} />
           <Route path="/my-listings" element={<RequireAuth><MyListingsPage /></RequireAuth>} />
-          <Route path="/listing/:id" element={<RequireAuth><ListingDetailPage /></RequireAuth>} />
+          <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/sell" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/listing/:id/edit" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
@@ -184,7 +184,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   const { user, logout } = useAuthStore();
   const navItems = user
     ? [...appNavItems, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
-    : [{ label: 'Market', to: '/catalog' }];
+    : [{ label: 'Market', to: '/catalog' }, { label: 'Vendre', to: '/sell' }];
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
@@ -990,6 +990,8 @@ function SellPage() {
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const submitLock = useRef(false);
   const [form, setForm] = useState({
     title: '',
     category: 'Motos',
@@ -1057,11 +1059,14 @@ function SellPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitLock.current || mutation.isPending) return;
     setPhotoError('');
     if (editingId === null && photos.length === 0) {
       setPhotoError('Ajoutez au moins une photo.');
       return;
     }
+    submitLock.current = true;
+    setUploading(true);
     let imageUrl: string | undefined;
     try {
       const uploaded: string[] = [];
@@ -1071,6 +1076,8 @@ function SellPage() {
       imageUrl = uploaded.length > 1 ? JSON.stringify(uploaded) : uploaded[0];
     } catch (error) {
       setPhotoError(error instanceof Error ? error.message : 'Impossible de traiter les photos sélectionnées.');
+      submitLock.current = false;
+      setUploading(false);
       return;
     }
     const isPartsCategory = form.category === PARTS_CATEGORY;
@@ -1088,6 +1095,11 @@ function SellPage() {
       fuel: !isPartsCategory ? form.fuel || undefined : undefined,
       transmission: !isPartsCategory ? form.transmission || undefined : undefined,
       availability: form.category === PARTS_CATEGORY ? form.availability : undefined
+    }, {
+      onSettled: () => {
+        submitLock.current = false;
+        setUploading(false);
+      }
     });
   };
 
@@ -1162,8 +1174,8 @@ function SellPage() {
         </label>
         
         {mutation.isError && <p role="alert" className="text-sm text-red-400 md:col-span-2">L’annonce n’a pas pu être enregistrée. Vérifiez les champs et réessayez.</p>}
-        <button type="submit" disabled={mutation.isPending} className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60 md:col-span-2">
-          {mutation.isPending ? 'Envoi en cours…' : editingId !== null ? 'Enregistrer les modifications' : 'Publier'}
+        <button type="submit" disabled={mutation.isPending || uploading} className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60 md:col-span-2">
+          {mutation.isPending || uploading ? 'Envoi en cours…' : editingId !== null ? 'Enregistrer les modifications' : 'Publier'}
         </button>
       </form>
     </div>
