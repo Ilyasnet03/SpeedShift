@@ -10,7 +10,7 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = useAuthStore.getState().user?.token;
-  const needsAuthentication = path.startsWith('/listings') || path.startsWith('/admin/');
+  const needsAuthentication = !path.startsWith('/auth/');
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
@@ -242,6 +242,7 @@ export type CreateListingPayload = {
   imageUrl?: string;
   description?: string;
   availability?: string;
+  showPhone?: boolean;
 };
 
 export type AdminDashboardStats = {
@@ -288,4 +289,73 @@ export type AdminListing = {
   availability?: string | null;
   fuel?: string | null;
   transmission?: string | null;
+  sellerId?: number | null;
+  showPhone?: boolean | null;
+  expiresAt?: string | null;
 };
+
+export type ReviewItem = { id: number; reviewerName: string; rating: number; comment: string | null; createdAt: string; mine: boolean };
+export type ReviewsResponse = { average: number | null; count: number; reviews: ReviewItem[] };
+
+export const getSellerReviews = (sellerId: number) => request<ReviewsResponse>(`/sellers/${sellerId}/reviews`);
+export const saveSellerReview = (sellerId: number, rating: number, comment: string) =>
+  request<ReviewsResponse>(`/sellers/${sellerId}/reviews`, { method: 'POST', body: JSON.stringify({ rating, comment }) });
+export const deleteSellerReview = (sellerId: number) => request<ReviewsResponse>(`/sellers/${sellerId}/reviews`, { method: 'DELETE' });
+
+export const reportListing = (id: number, reason: string, details: string) =>
+  request<void>(`/listings/${id}/report`, { method: 'POST', body: JSON.stringify({ reason, details }) });
+
+export function recordListingEvent(id: number, type: 'WHATSAPP' | 'CALL' | 'SHARE') {
+  void request<void>(`/listings/${id}/events`, { method: 'POST', body: JSON.stringify({ type }) }).catch(() => undefined);
+}
+
+export type ListingStats = { listingId: number; views: number; whatsapp: number; calls: number; shares: number; messages: number };
+export const getMyListingStats = () => request<ListingStats[]>('/listings/mine/stats');
+export const renewListing = (id: number) => request<AdminListing>(`/listings/${id}/renew`, { method: 'POST' });
+
+export type ConversationSummary = {
+  id: number; listingId: number; listingTitle: string; otherUserName: string; lastMessage: string; lastMessageAt: string; unreadCount: number;
+};
+export type MessageItem = { id: number; senderId: number; body: string; createdAt: string; mine: boolean };
+export type ConversationDetail = { conversation: ConversationSummary; messages: MessageItem[] };
+
+export const getConversations = () => request<ConversationSummary[]>('/conversations');
+export const getConversation = (id: number) => request<ConversationDetail>(`/conversations/${id}`);
+export const getUnreadCount = () => request<{ count: number }>('/conversations/unread-count');
+export const sendMessage = (id: number, body: string) =>
+  request<ConversationDetail>(`/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify({ body }) });
+export const startConversation = (listingId: number, body: string) =>
+  request<ConversationDetail>(`/listings/${listingId}/conversations`, { method: 'POST', body: JSON.stringify({ body }) });
+
+export type AdminReport = {
+  id: number; listingId: number; listingTitle: string; listingStatus: string | null; reporterEmail: string | null;
+  reason: string; details: string | null; status: 'OPEN' | 'RESOLVED' | 'DISMISSED'; createdAt: string; resolvedAt: string | null;
+};
+export type DayCount = { date: string; count: number };
+export type LabelCount = { label: string; count: number };
+export type AdminAnalytics = {
+  days: number; listingsByDay: DayCount[]; usersByDay: DayCount[]; viewsByDay: DayCount[];
+  listingsByCategory: LabelCount[]; listingsByStatus: LabelCount[];
+  totalViews: number; totalContacts: number; openReports: number; totalConversations: number;
+};
+export type AdminAuditEntry = {
+  id: number; adminEmail: string | null; action: string; targetType: string | null; targetId: number | null; details: string | null; createdAt: string;
+};
+
+export const getAdminReports = () => request<AdminReport[]>('/admin/reports');
+export const resolveAdminReport = (id: number, status: 'RESOLVED' | 'DISMISSED', archiveListing: boolean) =>
+  request<AdminReport>(`/admin/reports/${id}`, { method: 'PATCH', body: JSON.stringify({ status, archiveListing }) });
+export const getAdminAnalytics = (days = 30) => request<AdminAnalytics>(`/admin/analytics?days=${days}`);
+export const getAdminAudit = () => request<AdminAuditEntry[]>('/admin/audit?limit=200');
+
+export async function downloadAdminCsv(kind: 'users' | 'listings') {
+  const token = useAuthStore.getState().user?.token;
+  const response = await fetch(`${API_BASE}/admin/export/${kind}.csv`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) throw new ApiError(response.status);
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `speedshift-${kind}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}

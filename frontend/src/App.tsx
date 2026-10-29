@@ -42,6 +42,9 @@ import {
   getListing,
   getListings,
   getMyListings,
+  getMyListingStats,
+  recordListingEvent,
+  renewListing,
   loginUser,
   registerUser,
   verifyEmail,
@@ -60,6 +63,28 @@ import {
 } from './services/api';
 import { useAuthStore } from './store/authStore';
 import { useFavoritesStore } from './store/favoritesStore';
+import { useCompareStore } from './store/compareStore';
+import { useT } from './lib/i18n';
+import { coordsForCity, distanceKm, type Coords } from './lib/cities';
+import {
+  AdminAnalyticsTab,
+  AdminAuditTab,
+  AdminReportsTab,
+  CityMap,
+  CompareBar,
+  CompareToggle,
+  ComparePage,
+  ContactSellerButton,
+  LanguageSwitcher,
+  ListingLocationMap,
+  MessageThreadPage,
+  MessagesPage,
+  ReportButton,
+  SellerReviews,
+  ShareButtons,
+  useDocumentDirection,
+  useUnreadCount
+} from './features';
 
 const formatPrice = (value: number | string) =>
   `${new Intl.NumberFormat('fr-MA', { maximumFractionDigits: 0 }).format(Number(value))} DH`;
@@ -127,6 +152,7 @@ const appNavItems = [
 function App() {
   const user = useAuthStore((state) => state.user);
   const location = useLocation();
+  useDocumentDirection();
 
   useEffect(() => {
     trackVisit(location.pathname);
@@ -155,6 +181,9 @@ function App() {
           <Route path="/sell" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/listing/:id/edit" element={<RequireAuth><SellPage /></RequireAuth>} />
           <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
+          <Route path="/compare" element={<ComparePage />} />
+          <Route path="/messages" element={<RequireAuth><MessagesPage /></RequireAuth>} />
+          <Route path="/messages/:id" element={<RequireAuth><MessageThreadPage /></RequireAuth>} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/safety" element={<SafetyPage />} />
           <Route path="/contact" element={<ContactPage />} />
@@ -162,6 +191,7 @@ function App() {
         </Routes>
       </main>
       <Footer />
+      <CompareBar />
     </div>
   );
 }
@@ -182,9 +212,19 @@ function RequireAuth({ children, adminOnly = false }: { children: ReactNode; adm
 function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleTheme: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuthStore();
+  const t = useT();
+  const compareCount = useCompareStore((state) => state.ids.length);
+  const { data: unread } = useUnreadCount(Boolean(user));
+  const unreadCount = unread?.count ?? 0;
   const navItems = user
-    ? [...appNavItems, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
+    ? [...appNavItems, { label: 'Messages', to: '/messages' }, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
     : [{ label: 'Market', to: '/catalog' }, { label: 'Vendre', to: '/sell' }];
+  const navLabel = (item: { label: string; to: string }) => (
+    <>
+      {t(item.label)}
+      {item.to === '/messages' && unreadCount > 0 && <span className="ml-1.5 rounded-full bg-white px-1.5 text-[10px] font-semibold text-ember">{unreadCount}</span>}
+    </>
+  );
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
@@ -200,19 +240,21 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
         <nav aria-label="Navigation principale" className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 md:flex">
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} className={({ isActive }) => `rounded-full px-4 py-2 text-sm transition ${isActive ? 'bg-ember text-white' : 'text-stone hover:text-white'}`}>
-              {item.label}
+              {navLabel(item)}
             </NavLink>
           ))}
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
+          <LanguageSwitcher />
+          {compareCount > 0 && <Link to="/compare" className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white">{t('Comparateur')} ({compareCount})</Link>}
           {user ? (
             <div className="flex items-center gap-3">
               <span className="text-sm text-white">{user.firstName}</span>
-              <button onClick={logout} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white">Déconnexion</button>
+              <button onClick={logout} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white">{t('Déconnexion')}</button>
             </div>
           ) : (
-            <Link to="/login" className="rounded-full bg-ember px-4 py-2 text-sm font-medium text-white">Connexion</Link>
+            <Link to="/login" className="rounded-full bg-ember px-4 py-2 text-sm font-medium text-white">{t('Connexion')}</Link>
           )}
           <button type="button" onClick={onToggleTheme} aria-label={theme === 'dark' ? 'Activer le mode clair' : 'Activer le mode sombre'} title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'} className="rounded-full border border-white/10 bg-white/5 p-2 text-stone transition hover:text-white">
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -220,6 +262,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
         </div>
 
         <div className="flex items-center gap-2 md:hidden">
+          <LanguageSwitcher />
           <button type="button" onClick={onToggleTheme} aria-label={theme === 'dark' ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-white/10 p-2 text-stone">
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -235,13 +278,13 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
             <nav aria-label="Navigation mobile" className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4">
               {navItems.map((item) => (
                 <NavLink key={item.to} to={item.to} className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => setMenuOpen(false)}>
-                  {item.label}
+                  {navLabel(item)}
                 </NavLink>
               ))}
               {user ? (
-                <button onClick={() => { logout(); setMenuOpen(false); }} className="self-start rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5">Déconnexion</button>
+                <button onClick={() => { logout(); setMenuOpen(false); }} className="self-start rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5">{t('Déconnexion')}</button>
               ) : (
-                <NavLink to="/login" className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => setMenuOpen(false)}>Connexion</NavLink>
+                <NavLink to="/login" className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => setMenuOpen(false)}>{t('Connexion')}</NavLink>
               )}
             </nav>
           </motion.div>
@@ -252,17 +295,18 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
 }
 
 function Footer() {
+  const t = useT();
   return (
     <footer className="border-t border-white/10 bg-[#0a0b0d]">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-10 text-sm text-stone sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <div>
           <div className="font-display text-3xl uppercase text-white">SpeedShift</div>
-          <p className="mt-2 max-w-md text-stone/80">Marketplace premium pour les passionnés de deux-roues, voitures et machines sportives.</p>
+          <p className="mt-2 max-w-md text-stone/80">{t('Marketplace premium pour les passionnés de deux-roues, voitures et machines sportives.')}</p>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-3">
-          <Link to="/about" className="hover:text-white">À propos</Link>
-          <Link to="/safety" className="hover:text-white">Conseils anti-arnaque</Link>
-          <Link to="/contact" className="hover:text-white">Contact</Link>
+          <Link to="/about" className="hover:text-white">{t('À propos')}</Link>
+          <Link to="/safety" className="hover:text-white">{t('Conseils anti-arnaque')}</Link>
+          <Link to="/contact" className="hover:text-white">{t('Contact')}</Link>
         </div>
       </div>
     </footer>
@@ -676,6 +720,7 @@ function ListingCard({ listing }: { listing: any; compact?: boolean }) {
           >
             <Heart size={18} className={liked ? 'fill-red-500 text-red-500' : ''} />
           </button>
+          <CompareToggle listingId={listing.id} className="absolute bottom-3 left-3" />
         </div>
         <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
           <h3 className="line-clamp-1 text-base font-semibold text-white sm:text-lg">{heading}</h3>
@@ -708,6 +753,20 @@ function CatalogPage() {
   const emptyFilters = { priceMin: '', priceMax: '', yearMin: '', yearMax: '', mileageMax: '', fuel: '', transmission: '', availability: '' };
   const [filters, setFilters] = useState(emptyFilters);
   const setFilter = (field: keyof typeof emptyFilters, value: string) => setFilters((previous) => ({ ...previous, [field]: value }));
+  const t = useT();
+  const [near, setNear] = useState<Coords | null>(null);
+  const [radius, setRadius] = useState(100);
+  const [view, setView] = useState<'list' | 'map'>('list');
+  const [geoError, setGeoError] = useState(false);
+  const locate = () => {
+    if (near) { setNear(null); return; }
+    setGeoError(false);
+    if (!navigator.geolocation) { setGeoError(true); return; }
+    navigator.geolocation.getCurrentPosition(
+      (position) => setNear({ lat: position.coords.latitude, lng: position.coords.longitude }),
+      () => setGeoError(true)
+    );
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['listings', { category, query: appliedQuery, city: appliedCity, sort }],
@@ -729,10 +788,15 @@ function CatalogPage() {
     if (filters.fuel && !String(item.fuel ?? '').toLowerCase().startsWith(filters.fuel.toLowerCase().slice(0, 4))) return false;
     if (filters.transmission && !String(item.transmission ?? '').toLowerCase().startsWith(filters.transmission.toLowerCase().slice(0, 4))) return false;
     if (filters.availability && item.availability !== filters.availability) return false;
+    if (near) {
+      const coords = coordsForCity(item.city);
+      if (!coords || distanceKm(near, coords) > radius) return false;
+    }
     return true;
   };
   const isRecent = (item: any) => item.createdAt && Date.now() - new Date(item.createdAt).getTime() < 24 * 60 * 60 * 1000;
   const filtered = data.filter(matches).sort((a: any, b: any) => {
+    if (near) return distanceKm(near, coordsForCity(a.city)!) - distanceKm(near, coordsForCity(b.city)!);
     if (sort !== 'featured') return 0;
     return Number(isRecent(b) ? 1 : 0) - Number(isRecent(a) ? 1 : 0) || (isRecent(a) && isRecent(b) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0);
   });
@@ -826,6 +890,21 @@ function CatalogPage() {
         <div className="space-y-5">
           <div className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#121416] px-4 py-3">
             <div className="text-sm text-stone/80">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={locate} aria-pressed={Boolean(near)} className={`inline-flex items-center gap-1 rounded-full border px-3 py-2 text-sm ${near ? 'border-ember bg-ember text-white' : 'border-white/10 text-white'}`}>
+                <MapPin size={14} /> {t('Près de moi')}
+              </button>
+              {near && (
+                <select value={radius} onChange={(event) => setRadius(Number(event.target.value))} aria-label={t('Rayon')} className="rounded-full border border-white/10 bg-[#0b0c0e] px-3 py-2 text-sm text-white">
+                  {[25, 50, 100, 200, 500].map((value) => <option key={value} value={value}>{value} km</option>)}
+                </select>
+              )}
+              <div className="flex rounded-full border border-white/10 p-0.5 text-sm">
+                {(['list', 'map'] as const).map((mode) => (
+                  <button key={mode} type="button" onClick={() => setView(mode)} className={`rounded-full px-3 py-1.5 ${view === mode ? 'bg-ember text-white' : 'text-stone'}`}>{t(mode === 'list' ? 'Liste' : 'Carte')}</button>
+                ))}
+              </div>
+            </div>
             <select value={sort} onChange={(e) => setSort(e.target.value)} className="rounded-full border border-white/10 bg-[#0b0c0e] px-3 py-2 text-sm text-white">
               <option value="featured">À la une</option>
               <option value="price_asc">Prix ↑</option>
@@ -839,11 +918,14 @@ function CatalogPage() {
               <Zap size={16} className="text-ember" /> Annonces récentes affichées en premier — {recentCount} publiée{recentCount > 1 ? 's' : ''} il y a moins de 24 h
             </p>
           )}
+          {geoError && <p className="text-sm text-red-300">{t('Localisation indisponible.')}</p>}
+          {view === 'map' ? <CityMap listings={filtered} /> : (
           <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
             {filtered.map((item: any) => (
               <ListingCard key={item.id} listing={item} compact />
             ))}
           </div>
+          )}
           {filtered.length === 0 && <div className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone">Aucune annonce ne correspond à votre recherche.</div>}
         </div>
       </section>
@@ -945,14 +1027,29 @@ function ListingDetailPage() {
               <p className="rounded-2xl border border-white/10 bg-[#0d0f10] p-4 text-center text-sm text-stone">Cette annonce est vendue.</p>
             ) : (<>
             {buildWhatsAppUrl(data.sellerPhone, data) && (
-              <a href={buildWhatsAppUrl(data.sellerPhone, data)!} target="_blank" rel="noopener noreferrer" className="block w-full rounded-full bg-[#25D366] px-4 py-3 text-center text-sm font-medium text-white">Contacter sur WhatsApp</a>
+              <a href={buildWhatsAppUrl(data.sellerPhone, data)!} target="_blank" rel="noopener noreferrer" onClick={() => recordListingEvent(data.id, 'WHATSAPP')} className="block w-full rounded-full bg-[#25D366] px-4 py-3 text-center text-sm font-medium text-white">Contacter sur WhatsApp</a>
             )}
-            <a href={`tel:${data.sellerPhone}`} className="block w-full rounded-full bg-ember px-4 py-3 text-center text-sm font-medium text-white">Appeler le vendeur</a>
+            {data.sellerPhone && (
+              <a href={`tel:${data.sellerPhone}`} onClick={() => recordListingEvent(data.id, 'CALL')} className="block w-full rounded-full bg-ember px-4 py-3 text-center text-sm font-medium text-white">Appeler le vendeur</a>
+            )}
+            <ContactSellerButton listingId={data.id} />
             </>)}
             <p className="text-center text-xs text-stone/70">Contactez le vendeur pour discuter de cette annonce.</p>
+            <div className="flex items-center justify-between gap-2">
+              <CompareToggle listingId={data.id} />
+              <ReportButton listingId={data.id} />
+            </div>
           </div>
         </aside>
       </section>
+
+      <div className="rounded-[28px] border border-white/10 bg-[#121416] p-6">
+        <ShareButtons listingId={data.id} title={data.title} />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {data.sellerId != null && <SellerReviews sellerId={data.sellerId} />}
+        <ListingLocationMap city={data.city} />
+      </div>
     </div>
   );
 }
@@ -981,6 +1078,7 @@ function AvailabilityBadge({ value, className = '' }: { value?: string | null; c
 }
 
 function SellPage() {
+  const t = useT();
   const { id } = useParams();
   const editingId = id ? Number(id) : null;
   const navigate = useNavigate();
@@ -1004,7 +1102,8 @@ function SellPage() {
     description: '',
     availability: 'DISPONIBLE',
     fuel: '',
-    transmission: ''
+    transmission: '',
+    showPhone: true
   });
   const [prefilled, setPrefilled] = useState(false);
   useEffect(() => {
@@ -1021,7 +1120,8 @@ function SellPage() {
       description: editingListing.description ?? '',
       availability: editingListing.availability ?? 'DISPONIBLE',
       fuel: editingListing.fuel ?? '',
-      transmission: editingListing.transmission ?? ''
+      transmission: editingListing.transmission ?? '',
+      showPhone: editingListing.showPhone ?? true
     });
     setPrefilled(true);
   }, [editingListing, prefilled]);
@@ -1094,7 +1194,8 @@ function SellPage() {
       description: form.description.trim() || undefined,
       fuel: !isPartsCategory ? form.fuel || undefined : undefined,
       transmission: !isPartsCategory ? form.transmission || undefined : undefined,
-      availability: form.category === PARTS_CATEGORY ? form.availability : undefined
+      availability: form.category === PARTS_CATEGORY ? form.availability : undefined,
+      showPhone: form.showPhone
     }, {
       onSettled: () => {
         submitLock.current = false;
@@ -1172,6 +1273,10 @@ function SellPage() {
         <label className="space-y-2 text-sm text-stone md:col-span-2">Description
           <textarea maxLength={2000} rows={5} value={form.description} onChange={(event) => updateField('description', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
+        <label className="flex items-center gap-3 text-sm text-stone md:col-span-2">
+          <input type="checkbox" checked={form.showPhone} onChange={(event) => setForm((previous) => ({ ...previous, showPhone: event.target.checked }))} className="h-4 w-4 accent-[#D94A2B]" />
+          {t('Afficher mon numéro de téléphone')}
+        </label>
         
         {mutation.isError && <p role="alert" className="text-sm text-red-400 md:col-span-2">L’annonce n’a pas pu être enregistrée. Vérifiez les champs et réessayez.</p>}
         <button type="submit" disabled={mutation.isPending || uploading} className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60 md:col-span-2">
@@ -1185,6 +1290,20 @@ function SellPage() {
 function MyListingsPage() {
   const queryClient = useQueryClient();
   const listingsQuery = useQuery({ queryKey: ['my-listings'], queryFn: getMyListings });
+  const t = useT();
+  const statsQuery = useQuery({ queryKey: ['my-listing-stats'], queryFn: getMyListingStats });
+  const statsById = new Map((statsQuery.data ?? []).map((item) => [item.listingId, item]));
+  const renewMutation = useMutation({
+    mutationFn: renewListing,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['my-listings'] }),
+        queryClient.invalidateQueries({ queryKey: ['listings'] }),
+        queryClient.invalidateQueries({ queryKey: ['home'] })
+      ]);
+    }
+  });
+  const daysLeft = (value?: string | null) => (value ? Math.ceil((new Date(value).getTime() - Date.now()) / 86400000) : null);
   const deleteMutation = useMutation({
     mutationFn: deleteMyListing,
     onSuccess: async () => {
@@ -1237,8 +1356,31 @@ function MyListingsPage() {
                   <p className="text-sm text-stone">{[listing.brand, listing.model, listing.city].filter(Boolean).join(' · ')}</p>
                   <p className="font-display text-2xl text-ember">{formatPrice(listing.price)}</p>
                   <AvailabilityBadge value={listing.availability} />
+                  {(() => {
+                    const stats = statsById.get(listing.id);
+                    const left = daysLeft(listing.expiresAt);
+                    return (<>
+                      {stats && (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone">
+                          <span>{t('Vues')}: <b className="text-white">{stats.views}</b></span>
+                          <span>WhatsApp: <b className="text-white">{stats.whatsapp}</b></span>
+                          <span>{t('Appels')}: <b className="text-white">{stats.calls}</b></span>
+                          <span>{t('Partages')}: <b className="text-white">{stats.shares}</b></span>
+                          <span>{t('Messages')}: <b className="text-white">{stats.messages}</b></span>
+                        </div>
+                      )}
+                      {left !== null && (
+                        <p className={`text-xs ${left <= 3 ? 'text-red-400' : 'text-stone'}`}>
+                          {left > 0 ? `Expire dans ${left} jour${left > 1 ? 's' : ''}` : 'Expirée'}
+                        </p>
+                      )}
+                    </>);
+                  })()}
                 </div>
                 <div className="space-y-2 p-4 sm:w-60 sm:shrink-0">
+                  {listing.expiresAt && (
+                    <button type="button" disabled={renewMutation.isPending} onClick={() => renewMutation.mutate(listing.id)} className="w-full rounded-full bg-ember px-3 py-2 text-xs text-white disabled:opacity-50">{t('Renouveler')}</button>
+                  )}
                   {['published', 'reserved', 'sold'].includes(String(listing.status).toLowerCase()) && (
                     <div className="grid grid-cols-1 gap-2">
                       {String(listing.status).toLowerCase() !== 'published' && <button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: listing.id, status: 'PUBLISHED' })} className="rounded-full border border-emerald-500/40 px-3 py-2 text-xs text-emerald-500 disabled:opacity-50">Remettre en vente</button>}
@@ -1613,9 +1755,10 @@ function DashboardOverview({ stats, users, listings, views, visits, onModerate, 
 }
 
 function AdminPage() {
+  const t = useT();
   const currentUserEmail = useAuthStore((state) => state.user?.email);
   const queryClient = useQueryClient();
-  const [section, setSection] = useState<'stats' | 'users' | 'listings' | 'views' | 'visits'>('stats');
+  const [section, setSection] = useState<'stats' | 'users' | 'listings' | 'views' | 'visits' | 'reports' | 'analytics' | 'audit'>('stats');
   const visitsQuery = useQuery({ queryKey: ['admin', 'visits'], queryFn: getAdminSiteVisits, enabled: section === 'visits' || section === 'stats' });
   const [search, setSearch] = useState('');
   const viewsQuery = useQuery({ queryKey: ['admin', 'views'], queryFn: getAdminListingViews, enabled: section === 'views' || section === 'stats' });
@@ -1670,7 +1813,14 @@ function AdminPage() {
         <button type="button" className={tabClass('listings')} onClick={() => { setSection('listings'); setSearch(''); }}>Annonces</button>
         <button type="button" className={tabClass('views')} onClick={() => { setSection('views'); setSearch(''); }}>Consultations</button>
         <button type="button" className={tabClass('visits')} onClick={() => { setSection('visits'); setSearch(''); }}>Visiteurs</button>
+        <button type="button" className={tabClass('analytics')} onClick={() => { setSection('analytics'); setSearch(''); }}>{t('Analyses')}</button>
+        <button type="button" className={tabClass('reports')} onClick={() => { setSection('reports'); setSearch(''); }}>{t('Signalements')}</button>
+        <button type="button" className={tabClass('audit')} onClick={() => { setSection('audit'); setSearch(''); }}>{t('Journal d\'audit')}</button>
       </nav>
+
+      {section === 'analytics' && <AdminAnalyticsTab />}
+      {section === 'reports' && <AdminReportsTab />}
+      {section === 'audit' && <AdminAuditTab />}
 
       {(mutationError || deleteListingMutation.isError) && <p role="alert" className="text-sm text-red-400">Action impossible. {deleteListingMutation.error instanceof Error ? deleteListingMutation.error.message : 'Vérifiez les droits et réessayez.'}</p>}
 

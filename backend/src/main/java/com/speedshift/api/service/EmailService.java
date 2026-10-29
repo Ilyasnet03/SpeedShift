@@ -45,13 +45,26 @@ public class EmailService {
             + "Il est valable 15 minutes. Si vous n'êtes pas à l'origine de cette inscription, ignorez cet e-mail.\n\n"
             + "L'équipe SpeedShift";
 
+        deliver(to, subject, text, "code de vérification = " + code);
+    }
+
+    public void sendListingExpiryReminder(String to, String firstName, String listingTitle, String renewUrl) {
+        String subject = "SpeedShift : votre annonce expire bientôt";
+        String text = "Bonjour " + firstName + ",\n\n"
+            + "Votre annonce « " + listingTitle + " » expire dans moins de 3 jours.\n"
+            + "Renouvelez-la en un clic depuis « Mes annonces » : " + renewUrl + "\n\n"
+            + "L'équipe SpeedShift";
+        deliver(to, subject, text, "rappel d'expiration pour « " + listingTitle + " »");
+    }
+
+    private void deliver(String to, String subject, String text, String logFallback) {
         if (!brevoApiKey.isBlank() && !from.isBlank()) {
             sendWithBrevoApi(to, subject, text);
             return;
         }
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null || from.isBlank()) {
-            log.warn("E-mail non configuré : code de vérification pour {} = {}", to, code);
+            log.warn("E-mail non configuré : {} (destinataire {})", logFallback, to);
             return;
         }
         SimpleMailMessage message = new SimpleMailMessage();

@@ -26,6 +26,8 @@ import java.util.Objects;
 @Service
 public class ListingService {
 
+    public static final long LISTING_LIFETIME_DAYS = 30;
+
     private final ListingRepository listingRepository;
 
     public ListingService(ListingRepository listingRepository) {
@@ -34,7 +36,7 @@ public class ListingService {
 
     public List<ListingResponse> getListings(String category, String city, String query, String sort) {
         List<Listing> listings = listingRepository.findAll().stream()
-            .filter(item -> isPublic(item.getStatus()))
+            .filter(this::isVisible)
             .filter(item -> category == null || category.isBlank() || item.getCategory().equalsIgnoreCase(category))
             .filter(item -> city == null || city.isBlank() || (item.getCity() != null && item.getCity().equalsIgnoreCase(city)))
             .filter(item -> query == null || query.isBlank() ||
@@ -103,6 +105,9 @@ public class ListingService {
             .sellerRating(BigDecimal.ZERO)
             .views(0)
             .featured(false)
+            .expiresAt(now.plusDays(LISTING_LIFETIME_DAYS))
+            .expiryReminderSent(false)
+            .showPhone(request.showPhone() == null || request.showPhone())
             .description(request.description())
             .createdAt(now)
             .updatedAt(now)
@@ -131,6 +136,9 @@ public class ListingService {
         listing.setPrice(request.price());
         listing.setDescription(request.description());
         listing.setAvailability(resolveAvailability(request));
+        if (request.showPhone() != null) {
+            listing.setShowPhone(request.showPhone());
+        }
         if (request.imageUrl() != null && !request.imageUrl().isBlank()) {
             listing.setImageUrl(request.imageUrl());
         }
@@ -162,6 +170,27 @@ public class ListingService {
         return "published".equalsIgnoreCase(status) || "reserved".equalsIgnoreCase(status) || "sold".equalsIgnoreCase(status);
     }
 
+    private boolean isVisible(Listing listing) {
+        return isPublic(listing.getStatus())
+            && (listing.getExpiresAt() == null || listing.getExpiresAt().isAfter(LocalDateTime.now()));
+    }
+
+    @Transactional
+    public ListingResponse renewListing(Long id, User actor) {
+        Listing listing = listingRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Annonce introuvable."));
+        if (actor.getRole() != User.Role.ADMIN && !actor.getId().equals(listing.getSellerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Vous ne pouvez renouveler que vos propres annonces.");
+        }
+        if (!isPublic(listing.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette annonce ne peut pas être renouvelée.");
+        }
+        listing.setExpiresAt(LocalDateTime.now().plusDays(LISTING_LIFETIME_DAYS));
+        listing.setExpiryReminderSent(false);
+        listing.setUpdatedAt(LocalDateTime.now());
+        return toResponse(listingRepository.save(listing));
+    }
+
     public List<ListingResponse> getPendingListings() {
         return listingRepository.findAll().stream()
             .filter(item -> "pending".equalsIgnoreCase(item.getStatus()))
@@ -182,7 +211,7 @@ public class ListingService {
     public ListingDetailResponse getListingById(Long id) {
         Listing listing = listingRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Listing not found: " + id));
-        if (!isPublic(listing.getStatus())) {
+        if (!isVisible(listing)) {
             throw new IllegalArgumentException("Listing not found: " + id);
         }
 
@@ -203,7 +232,7 @@ public class ListingService {
             listing.getStatus(),
             listing.getPrice(),
             listing.getSellerName(),
-            listing.getSellerPhone(),
+            phoneFor(listing),
             listing.getVerified(),
             listing.getSellerRating(),
             listing.getFeatured(),
@@ -211,14 +240,17 @@ public class ListingService {
             listing.getDescription(),
             buildFeatures(listing),
             buildSpecs(listing),
-            listing.getAvailability()
+            listing.getAvailability(),
+            listing.getSellerId(),
+            listing.getShowPhone(),
+            listing.getCreatedAt()
         );
     }
 
     public HomeResponse getHomePage() {
         List<Listing> all = listingRepository.findAll();
         List<ListingResponse> featured = all.stream()
-            .filter(item -> isPublic(item.getStatus()))
+            .filter(this::isVisible)
             .filter(item -> Boolean.TRUE.equals(item.getFeatured()))
             .sorted(Comparator.comparing(Listing::getCreatedAt).reversed())
             .limit(4)
@@ -226,7 +258,7 @@ public class ListingService {
             .toList();
 
         List<ListingResponse> latest = all.stream()
-            .filter(item -> isPublic(item.getStatus()))
+            .filter(this::isVisible)
             .sorted(Comparator.comparing(Listing::getCreatedAt).reversed())
             .limit(6)
             .map(this::toResponse)
@@ -271,15 +303,22 @@ public class ListingService {
             listing.getStatus(),
             listing.getPrice(),
             listing.getSellerName(),
-            listing.getSellerPhone(),
+            phoneFor(listing),
             listing.getVerified(),
             listing.getSellerRating(),
             listing.getFeatured(),
             listing.getViews(),
             listing.getCreatedAt(),
             listing.getAvailability(),
-            listing.getDescription()
+            listing.getDescription(),
+            listing.getSellerId(),
+            listing.getShowPhone(),
+            listing.getExpiresAt()
         );
+    }
+
+    private String phoneFor(Listing listing) {
+        return Boolean.FALSE.equals(listing.getShowPhone()) ? null : listing.getSellerPhone();
     }
 
     private String clean(String value) {

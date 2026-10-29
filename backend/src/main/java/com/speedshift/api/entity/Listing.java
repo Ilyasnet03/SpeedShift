@@ -58,6 +58,9 @@ public class Listing {
     private BigDecimal sellerRating;
     private Integer views;
     private Boolean featured;
+    private LocalDateTime expiresAt;
+    private Boolean expiryReminderSent;
+    private Boolean showPhone;
 
     @Column(length = 2000)
     private String description;

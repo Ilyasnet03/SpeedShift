@@ -27,7 +27,8 @@ public class ListingDtos {
         @NotNull @DecimalMin("0.01") BigDecimal price,
         @Size(max = 8000000) String imageUrl,
         @Size(max = 2000) String description,
-        @Pattern(regexp = "DISPONIBLE|SUR_COMMANDE|RUPTURE") String availability
+        @Pattern(regexp = "DISPONIBLE|SUR_COMMANDE|RUPTURE") String availability,
+        Boolean showPhone
     ) {}
 
     public record ListingResponse(
@@ -54,7 +55,10 @@ public class ListingDtos {
         Integer views,
         java.time.LocalDateTime createdAt,
         String availability,
-        String description
+        String description,
+        Long sellerId,
+        Boolean showPhone,
+        java.time.LocalDateTime expiresAt
     ) {}
 
     public record ListingStatusRequest(
@@ -97,7 +101,10 @@ public class ListingDtos {
         String description,
         List<String> features,
         Map<String, String> specs,
-        String availability
+        String availability,
+        Long sellerId,
+        Boolean showPhone,
+        java.time.LocalDateTime createdAt
     ) {}
 
 }

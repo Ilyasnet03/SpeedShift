@@ -6,6 +6,7 @@ import com.speedshift.api.dto.ListingDtos.ListingDetailResponse;
 import com.speedshift.api.dto.ListingDtos.ListingResponse;
 import com.speedshift.api.dto.ListingDtos.ListingStatusRequest;
 import com.speedshift.api.service.ListingService;
+import com.speedshift.api.service.ListingEventService;
 import com.speedshift.api.entity.User;
 import com.speedshift.api.entity.ListingView;
 import com.speedshift.api.repository.ListingViewRepository;
@@ -25,9 +26,12 @@ public class ListingController {
 
     private final ListingViewRepository listingViewRepository;
 
-    public ListingController(ListingService listingService, ListingViewRepository listingViewRepository) {
+    private final ListingEventService eventService;
+
+    public ListingController(ListingService listingService, ListingViewRepository listingViewRepository, ListingEventService eventService) {
         this.listingService = listingService;
         this.listingViewRepository = listingViewRepository;
+        this.eventService = eventService;
     }
 
     @GetMapping("/health")
@@ -93,10 +97,16 @@ public class ListingController {
     @GetMapping("/listings/{id}")
     public ResponseEntity<ListingDetailResponse> getListing(@PathVariable Long id, @AuthenticationPrincipal User viewer) {
         ListingDetailResponse detail = listingService.getListingById(id);
+        eventService.recordView(id, detail.sellerId(), viewer);
         if (viewer != null) {
             listingViewRepository.save(new ListingView(id, viewer.getId()));
         }
         return ResponseEntity.ok(detail);
+    }
+
+    @PostMapping("/listings/{id}/renew")
+    public ResponseEntity<ListingResponse> renewListing(@PathVariable Long id, @AuthenticationPrincipal User actor) {
+        return ResponseEntity.ok(listingService.renewListing(id, actor));
     }
 
     @GetMapping("/admin/listings/pending")

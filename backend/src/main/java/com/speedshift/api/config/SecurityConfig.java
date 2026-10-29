@@ -76,7 +76,8 @@ public class SecurityConfig {
                     "/webjars/**"
                 ).permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/listings").permitAll()
-                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/listings/{id:\\d+}").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/listings/{id:\\d+}", "/api/sellers/*/reviews").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/listings/*/events").permitAll()
                 .anyRequest().authenticated()
             );
         return http.build();
