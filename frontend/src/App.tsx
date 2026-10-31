@@ -1,5 +1,5 @@
 import logoSpeedshift from './lib/WhatsApp Image 2026-10-31 at 1.00.08 AM (1).jpeg';
-import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+import { memo, type ChangeEvent, type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -68,18 +68,18 @@ import { useFavoritesStore } from './store/favoritesStore';
 import { useCompareStore } from './store/compareStore';
 import { useT } from './lib/i18n';
 import { coordsForCity, distanceKm, type Coords } from './lib/cities';
+import { CityCombobox } from './CityCombobox';
 import {
   AdminAnalyticsTab,
   AdminAuditTab,
   AdminReportsTab,
-  CityMap,
   CompareBar,
   CompareToggle,
   ComparePage,
   ContactSellerButton,
   LanguageSwitcher,
-  ListingLocationMap,
   MessageThreadPage,
+  MessageNotifier,
   MessagesPage,
   ReportButton,
   SellerReviews,
@@ -145,6 +145,7 @@ const transmissionOptions = ['Manuelle', 'Automatique'];
 const dataUrlToBlob = async (dataUrl: string) => (await fetch(dataUrl)).blob();
 
 const appNavItems = [
+  { label: 'Accueil', to: '/' },
   { label: 'Favoris', to: '/favorites' },
   { label: 'Market', to: '/catalog' },
   { label: 'Mes annonces', to: '/my-listings' },
@@ -171,7 +172,7 @@ function App() {
   return (
     <div className="min-h-screen bg-carbon text-stone">
       <Header theme={theme} onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />
-      <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+      <MessageNotifier icon={logoSpeedshift} />      <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <Routes>
           <Route path="/" element={<Navigate to="/catalog" replace />} />
           <Route path="/login" element={<LoginPage />} />
@@ -218,23 +219,6 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   const compareCount = useCompareStore((state) => state.ids.length);
   const { data: unread } = useUnreadCount(Boolean(user), user?.email);
   const unreadCount = unread?.count ?? 0;
-  const previousUnreadCount = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!user || unread?.count === undefined) {
-      previousUnreadCount.current = null;
-      return;
-    }
-
-    const previousCount = previousUnreadCount.current;
-    previousUnreadCount.current = unread.count;
-    if (previousCount !== null && unread.count > previousCount && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification('Nouveau message - SpeedShift', {
-        body: 'Vous avez reçu un nouveau message.',
-        icon: logoSpeedshift
-      });
-    }
-  }, [user, unread?.count]);
 
   const enableMessageNotifications = () => {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -244,7 +228,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
 
   const navItems = user
     ? [...appNavItems, { label: 'Messages', to: '/messages' }, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
-    : [{ label: 'Market', to: '/catalog' }, { label: 'Vendre', to: '/sell' }];
+    : [{ label: 'Accueil', to: '/' }, { label: 'Market', to: '/catalog' }, { label: 'Vendre', to: '/sell' }];
   const navLabel = (item: { label: string; to: string }) => (
     <span className="relative inline-flex items-center">
       {t(item.label)}
@@ -265,7 +249,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
 
         <nav aria-label="Navigation principale" className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 md:flex">
           {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to} onClick={item.to === '/messages' ? enableMessageNotifications : undefined} className={({ isActive }) => `rounded-full px-4 py-2 text-sm transition ${isActive ? 'bg-ember text-white' : 'text-stone hover:text-white'}`}>
+            <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={item.to === '/messages' ? enableMessageNotifications : undefined} className={({ isActive }) => `rounded-full px-4 py-2 text-sm transition ${isActive ? 'bg-ember text-white' : 'text-stone hover:text-white'}`}>
               {navLabel(item)}
             </NavLink>
           ))}
@@ -303,7 +287,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-white/10 bg-carbon md:hidden">
             <nav aria-label="Navigation mobile" className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4">
               {navItems.map((item) => (
-                <NavLink key={item.to} to={item.to} className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => { if (item.to === '/messages') enableMessageNotifications(); setMenuOpen(false); }}>
+                <NavLink key={item.to} to={item.to} end={item.to === '/'} className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => { if (item.to === '/messages') enableMessageNotifications(); setMenuOpen(false); }}>
                   {navLabel(item)}
                 </NavLink>
               ))}
@@ -707,7 +691,7 @@ function timeAgo(value?: string | null) {
   return months < 12 ? `il y a ${months} mois` : `il y a ${Math.floor(months / 12)} an${months >= 24 ? 's' : ''}`;
 }
 
-function ListingCard({ listing }: { listing: any; compact?: boolean }) {
+const ListingCard = memo(function ListingCard({ listing }: { listing: any; compact?: boolean }) {
   const userKey = useAuthStore((state) => state.user?.email) ?? 'guest';
   const liked = useFavoritesStore((state) => (state.byUser[userKey] ?? []).includes(listing.id));
   const toggleFavorite = useFavoritesStore((state) => state.toggle);
@@ -764,7 +748,7 @@ function ListingCard({ listing }: { listing: any; compact?: boolean }) {
       </Link>
     </motion.div>
   );
-}
+});
 
 function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -781,7 +765,6 @@ function CatalogPage() {
   const t = useT();
   const [near, setNear] = useState<Coords | null>(null);
   const [radius, setRadius] = useState(100);
-  const [view, setView] = useState<'list' | 'map'>('list');
   const [geoError, setGeoError] = useState('');
   const locate = () => {
     if (near) { setNear(null); return; }
@@ -804,29 +787,37 @@ function CatalogPage() {
     return <LoadingPanel />;
   }
 
-  const matches = (item: any) => {
-    const price = Number(item.price);
-    if (filters.priceMin && price < Number(filters.priceMin)) return false;
-    if (filters.priceMax && price > Number(filters.priceMax)) return false;
-    if (filters.yearMin && !(item.year >= Number(filters.yearMin))) return false;
-    if (filters.yearMax && !(item.year <= Number(filters.yearMax))) return false;
-    if (filters.mileageMax && !(item.mileage != null && item.mileage <= Number(filters.mileageMax))) return false;
-    if (filters.fuel && !String(item.fuel ?? '').toLowerCase().startsWith(filters.fuel.toLowerCase().slice(0, 4))) return false;
-    if (filters.transmission && !String(item.transmission ?? '').toLowerCase().startsWith(filters.transmission.toLowerCase().slice(0, 4))) return false;
-    if (filters.availability && item.availability !== filters.availability) return false;
-    if (near) {
-      const coords = coordsForCity(item.city);
-      if (!coords || distanceKm(near, coords) > radius) return false;
-    }
-    return true;
-  };
-  const isRecent = (item: any) => item.createdAt && Date.now() - new Date(item.createdAt).getTime() < 24 * 60 * 60 * 1000;
-  const filtered = data.filter(matches).sort((a: any, b: any) => {
-    if (near) return distanceKm(near, coordsForCity(a.city)!) - distanceKm(near, coordsForCity(b.city)!);
-    if (sort !== 'featured') return 0;
-    return Number(isRecent(b) ? 1 : 0) - Number(isRecent(a) ? 1 : 0) || (isRecent(a) && isRecent(b) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0);
-  });
-  const recentCount = filtered.filter(isRecent).length;
+  const { filtered, recentCount } = useMemo(() => {
+    const now = Date.now();
+    const isRecent = (item: any) => item.createdAt && now - new Date(item.createdAt).getTime() < 24 * 60 * 60 * 1000;
+    const filteredItems = data.filter((item: any) => {
+      const price = Number(item.price);
+      if (filters.priceMin && price < Number(filters.priceMin)) return false;
+      if (filters.priceMax && price > Number(filters.priceMax)) return false;
+      if (filters.yearMin && !(item.year >= Number(filters.yearMin))) return false;
+      if (filters.yearMax && !(item.year <= Number(filters.yearMax))) return false;
+      if (filters.mileageMax && !(item.mileage != null && item.mileage <= Number(filters.mileageMax))) return false;
+      if (filters.fuel && !String(item.fuel ?? '').toLowerCase().startsWith(filters.fuel.toLowerCase().slice(0, 4))) return false;
+      if (filters.transmission && !String(item.transmission ?? '').toLowerCase().startsWith(filters.transmission.toLowerCase().slice(0, 4))) return false;
+      if (filters.availability && item.availability !== filters.availability) return false;
+      if (near) {
+        const coords = coordsForCity(item.city);
+        if (!coords || distanceKm(near, coords) > radius) return false;
+      }
+      return true;
+    });
+
+    const distances: Map<any, number> | undefined = near
+      ? new Map(filteredItems.map((item: any) => [item.id, distanceKm(near, coordsForCity(item.city)!)]))
+      : undefined;
+    const sortedItems = filteredItems.sort((a: any, b: any) => {
+      if (distances) return distances.get(a.id)! - distances.get(b.id)!;
+      if (sort !== 'featured') return 0;
+      return Number(isRecent(b) ? 1 : 0) - Number(isRecent(a) ? 1 : 0) || (isRecent(a) && isRecent(b) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0);
+    });
+
+    return { filtered: sortedItems, recentCount: sortedItems.filter(isRecent).length };
+  }, [data, filters, near, radius, sort]);
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const filterInput = 'w-full rounded-xl border border-white/10 bg-black/20 p-3 text-white placeholder:text-stone/60';
 
@@ -862,7 +853,7 @@ function CatalogPage() {
             </label>
             <label className="block space-y-2">
               <span>Ville</span>
-              <input value={city} onChange={(event) => setCity(event.target.value)} onBlur={() => setSearchParams((previous) => { const next = new URLSearchParams(previous); city.trim() ? next.set('city', city.trim()) : next.delete('city'); return next; })} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); city.trim() ? next.set('city', city.trim()) : next.delete('city'); return next; }); }} placeholder="Ex. Casablanca" className="w-full rounded-xl border border-white/10 bg-black/20 p-3 text-white placeholder:text-stone/60" />
+              <CityCombobox value={city} onChange={(next) => { setCity(next); setSearchParams((previous) => { const params = new URLSearchParams(previous); next ? params.set('city', next) : params.delete('city'); return params; }); }} placeholder="Rechercher une ville…" className="bg-black/20" />
             </label>
             <div className="space-y-2">
               <span>Prix (DH)</span>
@@ -925,11 +916,6 @@ function CatalogPage() {
                   {[25, 50, 100, 200, 500].map((value) => <option key={value} value={value}>{value} km</option>)}
                 </select>
               )}
-              <div className="flex rounded-full border border-white/10 p-0.5 text-sm">
-                {(['list', 'map'] as const).map((mode) => (
-                  <button key={mode} type="button" onClick={() => setView(mode)} className={`rounded-full px-3 py-1.5 ${view === mode ? 'bg-ember text-white' : 'text-stone'}`}>{t(mode === 'list' ? 'Liste' : 'Carte')}</button>
-                ))}
-              </div>
             </div>
             <select value={sort} onChange={(e) => setSort(e.target.value)} className="rounded-full border border-white/10 bg-[#0b0c0e] px-3 py-2 text-sm text-white">
               <option value="featured">À la une</option>
@@ -946,13 +932,11 @@ function CatalogPage() {
           )}
           {geoError && <p className="text-sm text-red-300">{t(geoError)}</p>}
           {near && filtered.length === 0 && <p className="text-sm text-amber-300">Aucune annonce dans un rayon de {radius} km. Augmentez le rayon.</p>}
-          {view === 'map' ? <CityMap listings={filtered} /> : (
           <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
             {filtered.map((item: any) => (
               <ListingCard key={item.id} listing={item} compact />
             ))}
           </div>
-          )}
           {filtered.length === 0 && <div className="rounded-[24px] border border-white/10 bg-[#121416] p-8 text-center text-stone">Aucune annonce ne correspond à votre recherche.</div>}
         </div>
       </section>
@@ -1073,10 +1057,7 @@ function ListingDetailPage() {
       <div className="rounded-[28px] border border-white/10 bg-[#121416] p-6">
         <ShareButtons listingId={data.id} title={data.title} />
       </div>
-      <div className="grid gap-6 lg:grid-cols-2">
-        {data.sellerId != null && <SellerReviews sellerId={data.sellerId} />}
-        <ListingLocationMap city={data.city} />
-      </div>
+      {data.sellerId != null && <SellerReviews sellerId={data.sellerId} />}
     </div>
   );
 }
@@ -1284,7 +1265,7 @@ function SellPage() {
           <input required type="number" min="0.01" step="0.01" value={form.price} onChange={(event) => updateField('price', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
         </label>
         <label className="space-y-2 text-sm text-stone">Ville
-          <input maxLength={120} value={form.city} onChange={(event) => updateField('city', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white" />
+          <CityCombobox value={form.city} onChange={(city) => updateField('city', city)} className="bg-[#0d0f10]" />
         </label>
         <label className="space-y-2 text-sm text-stone md:col-span-2">
           Photos de l’annonce * (1 à 5)

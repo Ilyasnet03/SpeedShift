@@ -1,9 +1,6 @@
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { Check, Flag, Link2, MessageCircle, Share2, Star, Trash2 } from 'lucide-react';
 import {
   assetUrl,
@@ -29,7 +26,6 @@ import {
 import { useAuthStore } from './store/authStore';
 import { MAX_COMPARE, useCompareStore } from './store/compareStore';
 import { LANGS, useLangStore, useT } from './lib/i18n';
-import { coordsForCity, type Coords } from './lib/cities';
 
 const card = 'rounded-3xl border border-white/10 bg-[#121416] p-5';
 const input = 'w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-ember';
@@ -369,8 +365,80 @@ export function useUnreadCount(enabled: boolean, userEmail?: string) {
     queryKey: ['unread-count', userEmail],
     queryFn: async () => (await import('./services/api')).getUnreadCount(),
     enabled,
-    refetchInterval: 30000
+    refetchInterval: 10000,
+    refetchIntervalInBackground: true
   });
+}
+
+export function MessageNotifier({ icon }: { icon?: string }) {
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { data: unread } = useUnreadCount(Boolean(user), user?.email);
+  const previousCount = useRef<number | null>(null);
+  const [toast, setToast] = useState<{ id: number; title: string; body: string } | null>(null);
+
+  // Browsers only allow the permission prompt after a user gesture.
+  useEffect(() => {
+    if (!user || !('Notification' in window) || Notification.permission !== 'default') return;
+    const ask = () => void Notification.requestPermission();
+    window.addEventListener('pointerdown', ask, { once: true });
+    return () => window.removeEventListener('pointerdown', ask);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || unread?.count === undefined) {
+      previousCount.current = null;
+      return;
+    }
+    const previous = previousCount.current;
+    previousCount.current = unread.count;
+    if (previous === null || unread.count <= previous) return;
+
+    let cancelled = false;
+    (async () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      const conversations = await getConversations().catch(() => []);
+      if (cancelled) return;
+      const latest = conversations
+        .filter((conversation) => conversation.unreadCount > 0)
+        .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())[0];
+      const title = latest ? `Nouveau message de ${latest.otherUserName}` : 'Nouveau message - SpeedShift';
+      const body = latest ? `${latest.listingTitle} : ${latest.lastMessage}` : 'Vous avez reçu un nouveau message.';
+      const target = latest ? `/messages/${latest.id}` : '/messages';
+
+      if (!document.hidden) {
+        setToast({ id: Date.now(), title, body });
+        window.setTimeout(() => setToast((current) => (current && Date.now() - current.id >= 6000 ? null : current)), 6000);
+      }
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification(title, { body, icon, tag: 'speedshift-message' });
+        notification.onclick = () => {
+          window.focus();
+          navigate(target);
+          notification.close();
+        };
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, unread?.count, navigate, queryClient, icon]);
+
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\)\s*/, '');
+    document.title = unread?.count ? `(${unread.count}) ${base}` : base;
+  }, [unread?.count]);
+
+  if (!toast) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => { setToast(null); navigate('/messages'); }}
+      className="fixed bottom-4 right-4 z-[60] max-w-sm rounded-2xl border border-ember/40 bg-[#121416] p-4 text-left shadow-2xl"
+    >
+      <div className="flex items-center gap-2 text-sm font-semibold text-white"><MessageCircle size={16} className="text-ember" />{toast.title}</div>
+      <div className="mt-1 line-clamp-2 text-sm text-stone">{toast.body}</div>
+    </button>
+  );
 }
 
 export function MessagesPage() {
@@ -438,61 +506,6 @@ export function MessageThreadPage() {
         <input value={body} onChange={(event) => setBody(event.target.value)} maxLength={2000} placeholder={t('Écrivez un message…')} className={input} />
         <button type="submit" disabled={send.isPending || !body.trim()} className={primaryBtn}>{t('Envoyer')}</button>
       </form>
-    </div>
-  );
-}
-
-const markerIcon = L.divIcon({
-  className: '',
-  html: '<div style="width:18px;height:18px;border-radius:50%;background:#D94A2B;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>',
-  iconSize: [18, 18],
-  iconAnchor: [9, 9]
-});
-
-export function CityMap({ listings, height = 420 }: { listings: any[]; height?: number }) {
-  const groups = useMemo(() => {
-    const byCity = new Map<string, { coords: Coords; items: any[] }>();
-    listings.forEach((listing) => {
-      const coords = coordsForCity(listing.city);
-      if (!coords) return;
-      const key = String(listing.city).trim().toLowerCase();
-      const entry = byCity.get(key) ?? { coords, items: [] };
-      entry.items.push(listing);
-      byCity.set(key, entry);
-    });
-    return [...byCity.values()];
-  }, [listings]);
-
-  return (
-    <div className="overflow-hidden rounded-3xl border border-white/10" style={{ height }}>
-      <MapContainer center={[31.8, -7.1]} zoom={5} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
-        <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        {groups.map((group) => (
-          <Marker key={`${group.coords.lat}-${group.coords.lng}`} position={[group.coords.lat, group.coords.lng]} icon={markerIcon}>
-            <Popup>
-              <div className="space-y-1 text-sm">
-                <strong>{group.items[0].city} ({group.items.length})</strong>
-                {group.items.slice(0, 5).map((item) => (
-                  <div key={item.id}><Link to={`/listing/${item.id}`}>{item.title}</Link></div>
-                ))}
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-    </div>
-  );
-}
-
-export function ListingLocationMap({ city }: { city?: string | null }) {
-  const coords = coordsForCity(city);
-  if (!coords) return null;
-  return (
-    <div className="overflow-hidden rounded-3xl border border-white/10" style={{ height: 220 }}>
-      <MapContainer center={[coords.lat, coords.lng]} zoom={11} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
-        <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <Marker position={[coords.lat, coords.lng]} icon={markerIcon} />
-      </MapContainer>
     </div>
   );
 }
