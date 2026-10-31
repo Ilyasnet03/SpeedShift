@@ -1704,14 +1704,14 @@ function LoginPage() {
         <input required type="password" minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Mot de passe" />
 
         {error && <p className="text-sm text-red-400">{error}</p>}
-
         {info && <p role="status" className="text-sm text-emerald-400">{info}</p>}
+
         <button type="submit" className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">
           {mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
         </button>
       </form>
-    </div>
       {mode === 'login' && <button type="button" onClick={() => { setMode('forgot'); setResetRequested(false); setError(null); setInfo(null); }} className="mt-4 text-sm text-ember hover:underline">Mot de passe oublié ?</button>}
+    </div>
   );
 }
 
