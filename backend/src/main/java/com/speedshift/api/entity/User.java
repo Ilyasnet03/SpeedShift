@@ -61,6 +61,15 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private int verificationAttempts = 0;
 
+    private String passwordResetCode;
+
+    private LocalDateTime passwordResetExpiresAt;
+
+    private LocalDateTime passwordResetSentAt;
+
+    @Column(nullable = false)
+    private int passwordResetAttempts = 0;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 

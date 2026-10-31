@@ -37,4 +37,12 @@ public class AuthDtos {
     ) {}
 
     public record ResendCodeRequest(@NotBlank @Email String email) {}
+
+    public record ForgotPasswordRequest(@NotBlank @Email String email) {}
+
+    public record ResetPasswordRequest(
+        @NotBlank @Email String email,
+        @NotBlank @Pattern(regexp = "[0-9]{6}") String code,
+        @NotBlank @Size(min = 8, max = 72) String password
+    ) {}
 }

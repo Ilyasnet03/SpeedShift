@@ -1,10 +1,12 @@
 package com.speedshift.api.service;
 
 import com.speedshift.api.dto.AuthDtos.AuthResponse;
+import com.speedshift.api.dto.AuthDtos.ForgotPasswordRequest;
 import com.speedshift.api.dto.AuthDtos.LoginRequest;
 import com.speedshift.api.dto.AuthDtos.PendingVerificationResponse;
 import com.speedshift.api.dto.AuthDtos.RegisterRequest;
 import com.speedshift.api.dto.AuthDtos.ResendCodeRequest;
+import com.speedshift.api.dto.AuthDtos.ResetPasswordRequest;
 import com.speedshift.api.dto.AuthDtos.VerifyEmailRequest;
 import com.speedshift.api.entity.User;
 import com.speedshift.api.repository.UserRepository;
@@ -111,6 +113,54 @@ public class AuthenticationService {
             issueVerificationCode(user);
         }
         return new PendingVerificationResponse(request.email(), true);
+    }
+
+    public void requestPasswordReset(ForgotPasswordRequest request) {
+        User user = userRepository.findByEmail(request.email()).orElse(null);
+        if (user == null || !user.isEmailVerified()) {
+            return;
+        }
+        if (user.getPasswordResetSentAt() != null
+            && user.getPasswordResetSentAt().isAfter(LocalDateTime.now().minusSeconds(RESEND_DELAY_SECONDS))) {
+            return;
+        }
+
+        String code = String.format("%06d", RANDOM.nextInt(1_000_000));
+        user.setPasswordResetCode(passwordEncoder.encode(code));
+        user.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(15));
+        user.setPasswordResetSentAt(LocalDateTime.now());
+        user.setPasswordResetAttempts(0);
+        userRepository.save(user);
+        try {
+            emailService.sendPasswordResetCode(user.getEmail(), user.getFirstName(), code);
+        } catch (RuntimeException exception) {
+            log.error("Échec de l'envoi du code de réinitialisation à {}", user.getEmail(), exception);
+        }
+    }
+
+    public void resetPassword(ResetPasswordRequest request) {
+        User user = userRepository.findByEmail(request.email())
+            .filter(User::isEmailVerified)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Code invalide"));
+        if (user.getPasswordResetAttempts() >= MAX_ATTEMPTS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Code invalide ou expiré");
+        }
+        if (user.getPasswordResetCode() == null || user.getPasswordResetExpiresAt() == null
+            || user.getPasswordResetExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Code invalide ou expiré");
+        }
+        if (!passwordEncoder.matches(request.code(), user.getPasswordResetCode())) {
+            user.setPasswordResetAttempts(user.getPasswordResetAttempts() + 1);
+            userRepository.save(user);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Code invalide");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setPasswordResetCode(null);
+        user.setPasswordResetExpiresAt(null);
+        user.setPasswordResetAttempts(0);
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
     }
 
     private void issueVerificationCode(User user) {

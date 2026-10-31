@@ -1,4 +1,4 @@
-import logoSpeedshift from './lib/logo-speedshift.png';
+import logoSpeedshift from './lib/WhatsApp Image 2026-10-31 at 1.00.08 AM (1).jpeg';
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -49,6 +49,8 @@ import {
   registerUser,
   verifyEmail,
   resendVerificationCode,
+  requestPasswordReset,
+  resetPassword,
   ApiError,
   setAdminListingStatus,
   setAdminUserEnabled,
@@ -214,16 +216,40 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   const { user, logout } = useAuthStore();
   const t = useT();
   const compareCount = useCompareStore((state) => state.ids.length);
-  const { data: unread } = useUnreadCount(Boolean(user));
+  const { data: unread } = useUnreadCount(Boolean(user), user?.email);
   const unreadCount = unread?.count ?? 0;
+  const previousUnreadCount = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!user || unread?.count === undefined) {
+      previousUnreadCount.current = null;
+      return;
+    }
+
+    const previousCount = previousUnreadCount.current;
+    previousUnreadCount.current = unread.count;
+    if (previousCount !== null && unread.count > previousCount && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification('Nouveau message - SpeedShift', {
+        body: 'Vous avez reçu un nouveau message.',
+        icon: logoSpeedshift
+      });
+    }
+  }, [user, unread?.count]);
+
+  const enableMessageNotifications = () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      void Notification.requestPermission();
+    }
+  };
+
   const navItems = user
     ? [...appNavItems, { label: 'Messages', to: '/messages' }, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
     : [{ label: 'Market', to: '/catalog' }, { label: 'Vendre', to: '/sell' }];
   const navLabel = (item: { label: string; to: string }) => (
-    <>
+    <span className="relative inline-flex items-center">
       {t(item.label)}
-      {item.to === '/messages' && unreadCount > 0 && <span className="ml-1.5 rounded-full bg-white px-1.5 text-[10px] font-semibold text-ember">{unreadCount}</span>}
-    </>
+      {item.to === '/messages' && unreadCount > 0 && <span aria-label={`${unreadCount} message${unreadCount === 1 ? '' : 's'} non lu${unreadCount === 1 ? '' : 's'}`} className="absolute -right-3 -top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-ember px-1 text-[10px] font-bold text-white">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+    </span>
   );
 
   return (
@@ -239,7 +265,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
 
         <nav aria-label="Navigation principale" className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 md:flex">
           {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => `rounded-full px-4 py-2 text-sm transition ${isActive ? 'bg-ember text-white' : 'text-stone hover:text-white'}`}>
+            <NavLink key={item.to} to={item.to} onClick={item.to === '/messages' ? enableMessageNotifications : undefined} className={({ isActive }) => `rounded-full px-4 py-2 text-sm transition ${isActive ? 'bg-ember text-white' : 'text-stone hover:text-white'}`}>
               {navLabel(item)}
             </NavLink>
           ))}
@@ -277,7 +303,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-white/10 bg-carbon md:hidden">
             <nav aria-label="Navigation mobile" className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4">
               {navItems.map((item) => (
-                <NavLink key={item.to} to={item.to} className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => setMenuOpen(false)}>
+                <NavLink key={item.to} to={item.to} className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => { if (item.to === '/messages') enableMessageNotifications(); setMenuOpen(false); }}>
                   {navLabel(item)}
                 </NavLink>
               ))}
@@ -1439,7 +1465,7 @@ function LoginPage() {
   const { setUser } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -1452,6 +1478,10 @@ function LoginPage() {
   const [code, setCode] = useState('');
   const [info, setInfo] = useState<string | null>(null);
 
+  const [resetRequested, setResetRequested] = useState(false);
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const finishLogin = (response: any) => {
     setUser({
       email: response.email,
@@ -1530,6 +1560,86 @@ function LoginPage() {
   };
 
   if (pendingEmail) {
+  const handlePasswordResetRequest = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setInfo(null);
+    try {
+      await requestPasswordReset(form.email);
+      setResetRequested(true);
+      setInfo('Si un compte vérifié existe pour cette adresse, un code de réinitialisation lui a été envoyé.');
+    } catch {
+      setError('Demande impossible. Vérifiez votre adresse e-mail et réessayez.');
+    }
+  };
+
+  const handlePasswordResetResend = async () => {
+    setError(null);
+    setInfo(null);
+    try {
+      await requestPasswordReset(form.email);
+      setInfo('Si un compte vérifié existe pour cette adresse, un code de réinitialisation lui a été envoyé.');
+    } catch {
+      setError('Envoi impossible. Réessayez.');
+    }
+  };
+
+  const handlePasswordReset = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setInfo(null);
+    if (newPassword !== confirmPassword) {
+      setError('Les deux mots de passe ne correspondent pas.');
+      return;
+    }
+    try {
+      await resetPassword(form.email, resetCode.trim(), newPassword);
+      setMode('login');
+      setResetRequested(false);
+      setResetCode('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setForm((current) => ({ ...current, password: '' }));
+      setInfo('Mot de passe modifié. Vous pouvez maintenant vous connecter.');
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      setError(
+        status === 400 ? 'Code invalide ou expiré. Vérifiez le code reçu, ou demandez-en un nouveau.'
+        : 'Réinitialisation impossible. Réessayez.'
+      );
+    }
+  };
+
+  if (mode === 'forgot') {
+    return (
+      <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-6 sm:p-8">
+        <h1 className="font-display text-3xl uppercase text-white">Mot de passe oublié</h1>
+        <p className="mt-3 text-sm text-stone">Recevez un code de vérification par e-mail pour choisir un nouveau mot de passe.</p>
+        {!resetRequested ? (
+          <form onSubmit={handlePasswordResetRequest} className="mt-6 space-y-4">
+            <input required type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Adresse email" />
+            {info && <p role="status" className="text-sm text-emerald-400">{info}</p>}
+            {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+            <button type="submit" className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Envoyer un code</button>
+          </form>
+        ) : (
+          <>
+            <p className="mt-4 text-sm text-stone">{info}</p>
+            <form onSubmit={handlePasswordReset} className="mt-6 space-y-4">
+              <input required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={resetCode} onChange={(event) => setResetCode(event.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-center text-2xl tracking-[0.5em] text-white placeholder:text-stone/60" placeholder="000000" aria-label="Code de vérification" />
+              <input required type="password" minLength={8} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Nouveau mot de passe" />
+              <input required type="password" minLength={8} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Confirmer le mot de passe" />
+              {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+              <button type="submit" disabled={resetCode.length !== 6} className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60">Modifier le mot de passe</button>
+            </form>
+            <button type="button" onClick={handlePasswordResetResend} className="mt-4 text-sm text-ember hover:underline">Renvoyer le code</button>
+          </>
+        )}
+        <button type="button" onClick={() => { setMode('login'); setResetRequested(false); setError(null); setInfo(null); }} className="mt-5 block text-sm text-stone hover:text-white">Retour à la connexion</button>
+      </div>
+    );
+  }
+
     return (
       <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-6 sm:p-8">
         <h1 className="font-display text-3xl uppercase text-white">Vérifiez votre e-mail</h1>
@@ -1551,10 +1661,10 @@ function LoginPage() {
   return (
     <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-6 sm:p-8">
       <div className="flex gap-2 rounded-full border border-white/10 bg-[#0d0f10] p-1">
-        <button onClick={() => setMode('login')} className={`flex-1 rounded-full px-4 py-2 text-sm ${mode === 'login' ? 'bg-ember text-white' : 'text-stone'}`}>
+        <button type="button" onClick={() => setMode('login')} className={`flex-1 rounded-full px-4 py-2 text-sm ${mode === 'login' ? 'bg-ember text-white' : 'text-stone'}`}>
           Connexion
         </button>
-        <button onClick={() => setMode('register')} className={`flex-1 rounded-full px-4 py-2 text-sm ${mode === 'register' ? 'bg-ember text-white' : 'text-stone'}`}>
+        <button type="button" onClick={() => setMode('register')} className={`flex-1 rounded-full px-4 py-2 text-sm ${mode === 'register' ? 'bg-ember text-white' : 'text-stone'}`}>
           Inscription
         </button>
       </div>
@@ -1595,11 +1705,13 @@ function LoginPage() {
 
         {error && <p className="text-sm text-red-400">{error}</p>}
 
+        {info && <p role="status" className="text-sm text-emerald-400">{info}</p>}
         <button type="submit" className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">
           {mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
         </button>
       </form>
     </div>
+      {mode === 'login' && <button type="button" onClick={() => { setMode('forgot'); setResetRequested(false); setError(null); setInfo(null); }} className="mt-4 text-sm text-ember hover:underline">Mot de passe oublié ?</button>}
   );
 }
 

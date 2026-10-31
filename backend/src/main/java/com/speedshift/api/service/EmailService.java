@@ -48,6 +48,16 @@ public class EmailService {
         deliver(to, subject, text, "code de vérification = " + code);
     }
 
+    public void sendPasswordResetCode(String to, String firstName, String code) {
+        String subject = "SpeedShift : réinitialisation de votre mot de passe";
+        String text = "Bonjour " + firstName + ",\n\n"
+            + "Votre code de réinitialisation SpeedShift est : " + code + "\n\n"
+            + "Il est valable 15 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.\n\n"
+            + "L'équipe SpeedShift";
+
+        deliver(to, subject, text, "code de réinitialisation de mot de passe");
+    }
+
     public void sendListingExpiryReminder(String to, String firstName, String listingTitle, String renewUrl) {
         String subject = "SpeedShift : votre annonce expire bientôt";
         String text = "Bonjour " + firstName + ",\n\n"

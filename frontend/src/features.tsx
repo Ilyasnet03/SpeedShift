@@ -364,9 +364,9 @@ export function ComparePage() {
   );
 }
 
-export function useUnreadCount(enabled: boolean) {
+export function useUnreadCount(enabled: boolean, userEmail?: string) {
   return useQuery({
-    queryKey: ['unread-count'],
+    queryKey: ['unread-count', userEmail],
     queryFn: async () => (await import('./services/api')).getUnreadCount(),
     enabled,
     refetchInterval: 30000

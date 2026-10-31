@@ -57,6 +57,20 @@ export async function resendVerificationCode(email: string) {
   });
 }
 
+export async function requestPasswordReset(email: string) {
+  return request<void>('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  });
+}
+
+export async function resetPassword(email: string, code: string, password: string) {
+  return request<void>('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, code, password })
+  });
+}
+
 export async function getHome() {
   return request<any>('/home');
 }
