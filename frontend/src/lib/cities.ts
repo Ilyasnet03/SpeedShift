@@ -41,11 +41,30 @@ export const CITY_COORDS: Record<string, Coords> = {
   'saïdia': { lat: 35.0868, lng: -2.2299 }
 };
 
-const normalize = (city: string) => city.trim().toLowerCase();
+const normalize = (city: string) =>
+  city.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+
+const NORMALIZED_COORDS: Record<string, Coords> = Object.fromEntries(
+  Object.entries(CITY_COORDS).map(([name, coords]) => [normalize(name), coords])
+);
+Object.assign(NORMALIZED_COORDS, {
+  tangier: CITY_COORDS.tanger,
+  tangiers: CITY_COORDS.tanger,
+  marrakesh: CITY_COORDS.marrakech,
+  fez: CITY_COORDS.fes,
+  'casa': CITY_COORDS.casablanca,
+  'dar el beida': CITY_COORDS.casablanca,
+  'laayoune': CITY_COORDS.laayoune,
+  'sale': CITY_COORDS.rabat,
+  'temara': CITY_COORDS.rabat
+});
 
 export function coordsForCity(city?: string | null): Coords | null {
   if (!city) return null;
-  return CITY_COORDS[normalize(city)] ?? null;
+  const key = normalize(city);
+  if (NORMALIZED_COORDS[key]) return NORMALIZED_COORDS[key];
+  const partial = Object.keys(NORMALIZED_COORDS).find((name) => key.includes(name));
+  return partial ? NORMALIZED_COORDS[partial] : null;
 }
 
 export function distanceKm(a: Coords, b: Coords): number {

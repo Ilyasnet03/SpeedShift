@@ -746,7 +746,6 @@ function ListingCard({ listing }: { listing: any; compact?: boolean }) {
           >
             <Heart size={18} className={liked ? 'fill-red-500 text-red-500' : ''} />
           </button>
-          <CompareToggle listingId={listing.id} className="absolute bottom-3 left-3" />
         </div>
         <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
           <h3 className="line-clamp-1 text-base font-semibold text-white sm:text-lg">{heading}</h3>
@@ -783,14 +782,15 @@ function CatalogPage() {
   const [near, setNear] = useState<Coords | null>(null);
   const [radius, setRadius] = useState(100);
   const [view, setView] = useState<'list' | 'map'>('list');
-  const [geoError, setGeoError] = useState(false);
+  const [geoError, setGeoError] = useState('');
   const locate = () => {
     if (near) { setNear(null); return; }
-    setGeoError(false);
-    if (!navigator.geolocation) { setGeoError(true); return; }
+    setGeoError('');
+    if (!navigator.geolocation) { setGeoError('Localisation indisponible.'); return; }
     navigator.geolocation.getCurrentPosition(
       (position) => setNear({ lat: position.coords.latitude, lng: position.coords.longitude }),
-      () => setGeoError(true)
+      (error) => setGeoError(error.code === 1 ? 'Autorisez la localisation dans votre navigateur (cadenas de la barre d’adresse), puis réessayez.' : 'Position introuvable. Vérifiez que la localisation de l’appareil est activée.'),
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
     );
   };
 
@@ -944,7 +944,8 @@ function CatalogPage() {
               <Zap size={16} className="text-ember" /> Annonces récentes affichées en premier — {recentCount} publiée{recentCount > 1 ? 's' : ''} il y a moins de 24 h
             </p>
           )}
-          {geoError && <p className="text-sm text-red-300">{t('Localisation indisponible.')}</p>}
+          {geoError && <p className="text-sm text-red-300">{t(geoError)}</p>}
+          {near && filtered.length === 0 && <p className="text-sm text-amber-300">Aucune annonce dans un rayon de {radius} km. Augmentez le rayon.</p>}
           {view === 'map' ? <CityMap listings={filtered} /> : (
           <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
             {filtered.map((item: any) => (
@@ -1477,11 +1478,11 @@ function LoginPage() {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [info, setInfo] = useState<string | null>(null);
-
   const [resetRequested, setResetRequested] = useState(false);
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
   const finishLogin = (response: any) => {
     setUser({
       email: response.email,
@@ -1559,7 +1560,6 @@ function LoginPage() {
     }
   };
 
-  if (pendingEmail) {
   const handlePasswordResetRequest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
@@ -1640,6 +1640,7 @@ function LoginPage() {
     );
   }
 
+  if (pendingEmail) {
     return (
       <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-6 sm:p-8">
         <h1 className="font-display text-3xl uppercase text-white">Vérifiez votre e-mail</h1>
