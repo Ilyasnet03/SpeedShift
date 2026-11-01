@@ -235,12 +235,6 @@ function HalloweenDecor() {
         <circle cx="28" cy="41" r="1.2" fill="#ef4444" /><circle cx="32" cy="41" r="1.2" fill="#ef4444" />
         <circle cx="30" cy="72" r="2.6" fill="#f5f5dc" /><circle cx="26" cy="82" r="2.2" fill="#f5f5dc" opacity="0.85" /><circle cx="34" cy="90" r="1.8" fill="#f5f5dc" opacity="0.65" />
       </svg>
-      <svg viewBox="0 0 40 40" className="absolute left-[4.6rem] -top-2 h-8 w-8 sm:left-[5.1rem]">
-        <path d="M20 9 Q21 3 26 2" stroke="#15803d" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-        <ellipse cx="12" cy="23" rx="9" ry="11" fill="#ea580c" /><ellipse cx="28" cy="23" rx="9" ry="11" fill="#ea580c" /><ellipse cx="20" cy="23" rx="8" ry="12" fill="#f97316" />
-        <path d="M13 19 L16 23 L10 23 Z M27 19 L30 23 L24 23 Z" fill="#1c1917" />
-        <path d="M12 29 L16 27 L20 30 L24 27 L28 29 L24 33 L20 31 L16 33 Z" fill="#1c1917" />
-      </svg>
     </div>
   );
 }
