@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Pattern;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public final class AdminDtos {
 
@@ -71,6 +72,21 @@ public final class AdminDtos {
         String path,
         String userAgent,
         LocalDateTime visitedAt
+    ) {}
+
+    public record UserActivity(
+        Long userId,
+        String firstName,
+        String lastName,
+        String email,
+        Long totalSeconds,
+        Long activeDays
+    ) {}
+
+    public record ActivityStats(
+        long visitors,
+        long averageSecondsPerVisitor,
+        List<UserActivity> users
     ) {}
 
     public record EnabledUpdate(@NotNull Boolean enabled) {}

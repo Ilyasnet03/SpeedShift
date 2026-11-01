@@ -34,6 +34,8 @@ import {
   getAdminListings,
   getAdminListingViews,
   getAdminSiteVisits,
+  getAdminActivity,
+  startHeartbeat,
   trackVisit,
   getAdminStats,
   getAdminUsers,
@@ -61,6 +63,7 @@ import {
   type AdminDashboardStats,
   type AdminListingView,
   type AdminSiteVisit,
+  type AdminActivityStats,
   type CreateListingPayload
 } from './services/api';
 import { useAuthStore } from './store/authStore';
@@ -144,7 +147,6 @@ const transmissionOptions = ['Manuelle', 'Automatique'];
 const dataUrlToBlob = async (dataUrl: string) => (await fetch(dataUrl)).blob();
 
 const appNavItems = [
-  { label: 'Accueil', to: '/' },
   { label: 'Favoris', to: '/favorites' },
   { label: 'Market', to: '/catalog' },
   { label: 'Mes annonces', to: '/my-listings' },
@@ -159,6 +161,7 @@ function App() {
   useEffect(() => {
     trackVisit(location.pathname);
   }, [location.pathname]);
+  useEffect(() => startHeartbeat(), []);
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     localStorage.getItem('speedshift-theme') === 'dark' ? 'dark' : 'light'
   );
@@ -174,7 +177,8 @@ function App() {
       <MessageNotifier icon={logoSpeedshift} />
       <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<Navigate to="/catalog" replace />} />
+          <Route path="/accueil" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/marketplace" element={<Navigate to="/catalog" replace />} />
           <Route path="/catalog" element={<CatalogPage />} />
@@ -228,7 +232,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
 
   const navItems = user
     ? [...appNavItems, { label: 'Messages', to: '/messages' }, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
-    : [{ label: 'Accueil', to: '/' }, { label: 'Market', to: '/catalog' }, { label: 'Vendre', to: '/sell' }];
+    : [{ label: 'Market', to: '/catalog' }, { label: 'Vendre', to: '/sell' }];
   const navLabel = (item: { label: string; to: string }) => (
     <span className="relative inline-flex items-center">
       {t(item.label)}
@@ -239,7 +243,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-2 sm:gap-3">
+        <Link to="/catalog" className="flex items-center gap-2 sm:gap-3">
           <img src={logoSpeedshift} alt="SpeedShift" className="h-9 w-9 rounded-full object-cover sm:h-10 sm:w-10" />
           <div>
             <div className="font-display text-2xl uppercase leading-none text-white sm:text-3xl">SpeedShift</div>
@@ -762,6 +766,15 @@ function CatalogPage() {
   const emptyFilters = { priceMin: '', priceMax: '', yearMin: '', yearMax: '', mileageMax: '', fuel: '', transmission: '', availability: '' };
   const [filters, setFilters] = useState(emptyFilters);
   const setFilter = (field: keyof typeof emptyFilters, value: string) => setFilters((previous) => ({ ...previous, [field]: value }));
+  const popularCities = ['Casablanca', 'Rabat', 'Marrakech', 'Tanger', 'Fès', 'Agadir'];
+  const selectCity = (next: string) => {
+    setCity(next);
+    setSearchParams((previous) => {
+      const params = new URLSearchParams(previous);
+      if (next) params.set('city', next); else params.delete('city');
+      return params;
+    });
+  };
   const t = useT();
 
   const { data, isLoading } = useQuery({
@@ -881,18 +894,30 @@ function CatalogPage() {
         </aside>}
 
         <div className="space-y-5">
-          <div className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#121416] px-4 py-3">
-            <div className="text-sm text-stone/80">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</div>
-            <div className="w-56">
-              <CityCombobox value={city} onChange={(next) => { setCity(next); setSearchParams((previous) => { const params = new URLSearchParams(previous); next ? params.set('city', next) : params.delete('city'); return params; }); }} placeholder="Choisir une ville…" className="bg-[#0b0c0e]" />
+          <div className="space-y-4 rounded-[24px] border border-white/10 bg-[#121416] p-4">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_200px]">
+              <label className="block space-y-1.5">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-stone/70">Ville</span>
+                <CityCombobox value={city} onChange={selectCity} placeholder="Toutes les villes du Maroc" className="bg-[#0b0c0e]" />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-stone/70">Trier par</span>
+                <select value={sort} onChange={(e) => setSort(e.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0b0c0e] p-3 text-sm text-white">
+                  <option value="featured">À la une</option>
+                  <option value="price_asc">Prix ↑</option>
+                  <option value="price_desc">Prix ↓</option>
+                  <option value="newest">Nouveautés</option>
+                  <option value="popular">Populaires</option>
+                </select>
+              </label>
             </div>
-            <select value={sort} onChange={(e) => setSort(e.target.value)} className="rounded-full border border-white/10 bg-[#0b0c0e] px-3 py-2 text-sm text-white">
-              <option value="featured">À la une</option>
-              <option value="price_asc">Prix ↑</option>
-              <option value="price_desc">Prix ↓</option>
-              <option value="newest">Nouveautés</option>
-              <option value="popular">Populaires</option>
-            </select>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => selectCity('')} className={`rounded-full border px-3 py-1 text-xs transition ${city ? 'border-white/10 text-stone hover:text-white' : 'border-ember bg-ember text-white'}`}>Toutes</button>
+              {popularCities.map((name) => (
+                <button key={name} type="button" onClick={() => selectCity(name)} className={`rounded-full border px-3 py-1 text-xs transition ${city === name ? 'border-ember bg-ember text-white' : 'border-white/10 text-stone hover:text-white'}`}>{name}</button>
+              ))}
+              <span className="ml-auto text-sm text-stone/80">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</span>
+            </div>
           </div>
           {sort === 'featured' && recentCount > 0 && (
             <p className="flex items-center gap-2 rounded-[24px] border border-ember/40 bg-ember/10 px-4 py-3 text-sm text-white">
@@ -1664,12 +1689,13 @@ function LoginPage() {
   );
 }
 
-function DashboardOverview({ stats, users, listings, views, visits, onModerate, onOpen }: {
+function DashboardOverview({ stats, users, listings, views, visits, activity, onModerate, onOpen }: {
   stats: AdminDashboardStats;
   users: AdminUser[];
   listings: AdminListing[];
   views: AdminListingView[];
   visits: AdminSiteVisit[];
+  activity?: AdminActivityStats;
   onModerate: (id: number, status: AdminListingStatus) => void;
   onOpen: (section: 'users' | 'listings' | 'views' | 'visits') => void;
 }) {
@@ -1708,7 +1734,8 @@ function DashboardOverview({ stats, users, listings, views, visits, onModerate, 
     ['Prix moyen', formatPrice(stats.averagePublishedPrice), 'Annonces publiées'],
     ['Visiteurs uniques', uniqueVisitors, `${anonymousVisitors} anonymes · ${visitsToday.length} visites aujourd'hui`],
     ['Visites enregistrées', visits.length, 'Dernières 500 pages vues'],
-    ['Consultations d\'annonces', views.length, 'Par utilisateurs connectés']
+    ['Consultations d\'annonces', views.length, 'Par utilisateurs connectés'],
+    ['Temps moyen / visiteur', formatDuration(activity?.averageSecondsPerVisitor ?? 0), `${activity?.visitors ?? 0} visiteurs sur la période`]
   ];
   const card = 'rounded-[24px] border border-white/10 bg-[#121416] p-5';
   const bar = (label: string, value: number, max: number) => (
@@ -1793,6 +1820,15 @@ function DashboardOverview({ stats, users, listings, views, visits, onModerate, 
 
       <div className="grid gap-6 lg:grid-cols-2">
         <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Temps actif par utilisateur</h2>
+          <ul className="mt-4 space-y-3">
+            {(activity?.users ?? []).slice(0, 8).map((item) => (
+              <li key={item.userId} className="flex justify-between gap-3 text-sm"><span className="truncate text-white">{item.firstName} {item.lastName} <span className="text-stone">· {item.email}</span></span><span className="shrink-0 text-xs text-stone">{formatDuration(item.totalSeconds)} · {item.activeDays} j</span></li>
+            ))}
+            {!activity?.users.length && <li className="text-sm text-stone">Aucune donnée sur la période.</li>}
+          </ul>
+        </article>
+        <article className={card}>
           <div className="flex items-center justify-between"><h2 className="font-display text-2xl uppercase text-white">Activité des visiteurs</h2><button type="button" onClick={() => onOpen('visits')} className="text-xs uppercase tracking-[0.2em] text-ember">Tout voir</button></div>
           <ul className="mt-4 space-y-3">
             {visits.slice(0, 6).map((visit) => (
@@ -1801,6 +1837,9 @@ function DashboardOverview({ stats, users, listings, views, visits, onModerate, 
             {visits.length === 0 && <li className="text-sm text-stone">Aucune visite.</li>}
           </ul>
         </article>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
         <article className={card}>
           <div className="flex items-center justify-between"><h2 className="font-display text-2xl uppercase text-white">Dernières consultations</h2><button type="button" onClick={() => onOpen('views')} className="text-xs uppercase tracking-[0.2em] text-ember">Tout voir</button></div>
           <ul className="mt-4 space-y-3">
@@ -1815,6 +1854,25 @@ function DashboardOverview({ stats, users, listings, views, visits, onModerate, 
   );
 }
 
+type Period = 'today' | 'month' | 'year' | 'custom';
+
+const localDay = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const periodRange = (period: Period, customFrom: string, customTo: string) => {
+  const now = new Date();
+  const today = localDay(now);
+  if (period === 'today') return { from: today, to: today };
+  if (period === 'month') return { from: localDay(new Date(now.getFullYear(), now.getMonth(), 1)), to: today };
+  if (period === 'year') return { from: `${now.getFullYear()}-01-01`, to: today };
+  return { from: customFrom || today, to: customTo || today };
+};
+
+const formatDuration = (seconds: number) => {
+  const minutes = Math.floor(seconds / 60);
+  if (minutes >= 60) return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;
+  return minutes > 0 ? `${minutes} min ${String(seconds % 60).padStart(2, '0')} s` : `${seconds} s`;
+};
+
 function AdminPage() {
   const t = useT();
   const currentUserEmail = useAuthStore((state) => state.user?.email);
@@ -1826,6 +1884,14 @@ function AdminPage() {
   const statsQuery = useQuery({ queryKey: ['admin', 'stats'], queryFn: getAdminStats, enabled: section === 'stats' });
   const usersQuery = useQuery({ queryKey: ['admin', 'users'], queryFn: getAdminUsers, enabled: section === 'users' || section === 'stats' });
   const listingsQuery = useQuery({ queryKey: ['admin', 'listings'], queryFn: getAdminListings, enabled: section === 'listings' || section === 'stats' });
+  const [period, setPeriod] = useState<Period>('month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const range = periodRange(period, customFrom, customTo);
+  const activityQuery = useQuery({ queryKey: ['admin', 'activity', range.from, range.to], queryFn: () => getAdminActivity(range.from, range.to), enabled: section === 'stats' && range.from <= range.to });
+  const inRange = (value: string | null) => Boolean(value) && localDay(new Date(value as string)) >= range.from && localDay(new Date(value as string)) <= range.to;
+  const periodViews = (viewsQuery.data ?? []).filter((view) => inRange(view.viewedAt));
+  const periodVisits = (visitsQuery.data ?? []).filter((visit) => inRange(visit.visitedAt));
 
   const refreshAdminData = async () => {
     await Promise.all([
@@ -1857,6 +1923,34 @@ function AdminPage() {
   });
 
   const mutationError = enabledMutation.isError || roleMutation.isError || deleteUserMutation.isError || listingMutation.isError;
+  const pendingListings = (listingsQuery.data ?? []).filter((listing) => listing.status === 'PENDING');
+  const validatePending = async () => {
+    if (pendingListings.length === 0 || !window.confirm(`Publier les ${pendingListings.length} annonce(s) en attente ?`)) return;
+    await Promise.all(pendingListings.map((listing) => setAdminListingStatus(listing.id, 'PUBLISHED')));
+    await refreshAdminData();
+  };
+  const exportCsv = () => {
+    const stats = statsQuery.data;
+    const cell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+    const rows: (string | number)[][] = [
+      ['Période', range.from, range.to],
+      ['Utilisateurs', stats?.totalUsers ?? ''],
+      ['Annonces', stats?.totalListings ?? ''],
+      ['Annonces en attente', stats?.pendingListings ?? ''],
+      ['Visiteurs', activityQuery.data?.visitors ?? ''],
+      ['Temps moyen par visiteur (s)', activityQuery.data?.averageSecondsPerVisitor ?? ''],
+      [],
+      ['Utilisateur', 'E-mail', 'Temps actif (s)', 'Jours actifs'],
+      ...(activityQuery.data?.users ?? []).map((item) => [`${item.firstName} ${item.lastName}`, item.email, item.totalSeconds, item.activeDays])
+    ];
+    const blob = new Blob([`\uFEFF${rows.map((row) => row.map(cell).join(';')).join('\n')}`], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `speedshift-rapport-${range.from}-${range.to}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+  const periodOptions: [Period, string][] = [['today', 'Aujourd\'hui'], ['month', 'Ce mois-ci'], ['year', 'Cette année'], ['custom', 'Personnalisé']];
   const tabClass = (tab: typeof section) =>
     `rounded-full px-5 py-3 text-sm font-medium transition ${section === tab ? 'bg-ember text-white' : 'border border-white/10 bg-white/5 text-stone hover:text-white'}`;
 
@@ -1886,13 +1980,39 @@ function AdminPage() {
       {(mutationError || deleteListingMutation.isError) && <p role="alert" className="text-sm text-red-400">Action impossible. {deleteListingMutation.error instanceof Error ? deleteListingMutation.error.message : 'Vérifiez les droits et réessayez.'}</p>}
 
       {section === 'stats' && (
+        <div className="space-y-4 rounded-[24px] border border-white/10 bg-[#121416] p-5 print:hidden">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <h2 className="font-display text-3xl uppercase text-white">Tableau de bord - Vue d'ensemble</h2>
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Période">
+              {periodOptions.map(([value, label]) => (
+                <button key={value} type="button" onClick={() => setPeriod(value)} className={`rounded-full px-4 py-2 text-sm transition ${period === value ? 'bg-ember text-white' : 'border border-white/10 text-stone hover:text-white'}`}>{label}</button>
+              ))}
+            </div>
+          </div>
+          {period === 'custom' && (
+            <div className="flex flex-wrap items-center gap-3 text-sm text-stone">
+              <label className="flex items-center gap-2">Du <input type="date" value={customFrom} max={customTo || undefined} onChange={(event) => setCustomFrom(event.target.value)} className="rounded-xl border border-white/10 bg-[#0d0f10] p-2 text-white" /></label>
+              <label className="flex items-center gap-2">Au <input type="date" value={customTo} min={customFrom || undefined} onChange={(event) => setCustomTo(event.target.value)} className="rounded-xl border border-white/10 bg-[#0d0f10] p-2 text-white" /></label>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-3">
+            <button type="button" disabled={pendingListings.length === 0} onClick={() => void validatePending()} className="rounded-full bg-ember px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Valider les annonces en attente ({pendingListings.length})</button>
+            <button type="button" onClick={exportCsv} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">Exporter CSV</button>
+            <button type="button" onClick={() => window.print()} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">Exporter PDF</button>
+            <button type="button" onClick={() => setSection('reports')} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">Gérer les utilisateurs signalés</button>
+          </div>
+        </div>
+      )}
+
+      {section === 'stats' && (
         statsQuery.isLoading ? <LoadingPanel /> : statsQuery.isError || !statsQuery.data ? <ErrorPanel error={statsQuery.error} onRetry={() => statsQuery.refetch()} /> : (
           <DashboardOverview
             stats={statsQuery.data}
             users={usersQuery.data ?? []}
             listings={listingsQuery.data ?? []}
-            views={viewsQuery.data ?? []}
-            visits={visitsQuery.data ?? []}
+            views={periodViews}
+            visits={periodVisits}
+            activity={activityQuery.data}
             onModerate={(id, status) => listingMutation.mutate({ id, status })}
             onOpen={setSection}
           />

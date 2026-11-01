@@ -180,17 +180,57 @@ export type AdminSiteVisit = {
 };
 
 export function trackVisit(path: string) {
-  let visitorId = localStorage.getItem('speedshift-visitor');
-  if (!visitorId) {
-    visitorId = crypto.randomUUID();
-    localStorage.setItem('speedshift-visitor', visitorId);
-  }
+  const visitorId = getVisitorId();
   const token = useAuthStore.getState().user?.token;
   void fetch(`${API_BASE}/public/visits`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify({ visitorId, path })
   }).catch(() => undefined);
+}
+
+function getVisitorId() {
+  let visitorId = localStorage.getItem('speedshift-visitor');
+  if (!visitorId) {
+    visitorId = crypto.randomUUID();
+    localStorage.setItem('speedshift-visitor', visitorId);
+  }
+  return visitorId;
+}
+
+const HEARTBEAT_SECONDS = 15;
+
+// Compte le temps passé onglet visible, par tranches de 15 s.
+export function startHeartbeat() {
+  const timer = window.setInterval(() => {
+    if (document.hidden) return;
+    const token = useAuthStore.getState().user?.token;
+    void fetch(`${API_BASE}/public/heartbeat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ visitorId: getVisitorId(), seconds: HEARTBEAT_SECONDS })
+    }).catch(() => undefined);
+  }, HEARTBEAT_SECONDS * 1000);
+  return () => window.clearInterval(timer);
+}
+
+export type AdminUserActivity = {
+  userId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  totalSeconds: number;
+  activeDays: number;
+};
+
+export type AdminActivityStats = {
+  visitors: number;
+  averageSecondsPerVisitor: number;
+  users: AdminUserActivity[];
+};
+
+export async function getAdminActivity(from: string, to: string) {
+  return request<AdminActivityStats>(`/admin/activity?from=${from}&to=${to}`);
 }
 
 export async function getAdminListingViews() {

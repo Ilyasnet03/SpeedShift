@@ -417,12 +417,19 @@ export function MessageNotifier({ icon }: { icon?: string }) {
         window.setTimeout(() => setToast((current) => (current && Date.now() - current.id >= 6000 ? null : current)), 6000);
       }
       if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification(title, { body, icon, tag: 'speedshift-message' });
-        notification.onclick = () => {
-          window.focus();
-          navigate(target);
-          notification.close();
-        };
+        const options = { body, icon, tag: 'speedshift-message', data: { url: target } };
+        const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration().catch(() => undefined) : undefined;
+        if (registration) {
+          // Seule voie supportée sur mobile (Android/iOS) : le constructeur Notification y est refusé.
+          await registration.showNotification(title, options);
+        } else {
+          const notification = new Notification(title, options);
+          notification.onclick = () => {
+            window.focus();
+            navigate(target);
+            notification.close();
+          };
+        }
       }
     })();
     return () => { cancelled = true; };
