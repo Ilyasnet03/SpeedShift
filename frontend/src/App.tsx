@@ -218,6 +218,33 @@ function RequireAuth({ children, adminOnly = false }: { children: ReactNode; adm
   return <>{children}</>;
 }
 
+function HalloweenDecor() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute left-0 top-0 h-full w-0">
+      <svg viewBox="0 0 90 90" className="absolute -left-4 -top-4 h-20 w-20 sm:-left-6 sm:h-24 sm:w-24" fill="none" stroke="#cbd5e1" strokeWidth="0.8" opacity="0.75">
+        <path d="M0 0 L90 0 M0 0 L0 90 M0 0 L80 55 M0 0 L55 80 M0 0 L88 25 M0 0 L25 88" />
+        <path d="M18 0 Q14 14 0 18 M36 0 Q30 30 0 36 M54 0 Q46 46 0 54 M72 0 Q62 62 0 72" />
+      </svg>
+      <svg viewBox="0 0 60 110" className="absolute left-2 top-0 h-16 w-9 origin-top animate-[spiderSwing_4s_ease-in-out_infinite] sm:left-3 sm:h-20 sm:w-11">
+        <line x1="30" y1="0" x2="30" y2="38" stroke="#cbd5e1" strokeWidth="1" />
+        <g stroke="#111" strokeWidth="2" strokeLinecap="round" fill="none">
+          <path d="M26 46 L14 40 L8 48 M26 50 L12 52 L8 60 M34 46 L46 40 L52 48 M34 50 L48 52 L52 60" />
+        </g>
+        <ellipse cx="30" cy="42" rx="5" ry="5" fill="#111" />
+        <ellipse cx="30" cy="56" rx="8" ry="10" fill="#1a1a1a" />
+        <circle cx="28" cy="41" r="1.2" fill="#ef4444" /><circle cx="32" cy="41" r="1.2" fill="#ef4444" />
+        <circle cx="30" cy="72" r="2.6" fill="#f5f5dc" /><circle cx="26" cy="82" r="2.2" fill="#f5f5dc" opacity="0.85" /><circle cx="34" cy="90" r="1.8" fill="#f5f5dc" opacity="0.65" />
+      </svg>
+      <svg viewBox="0 0 40 40" className="absolute left-[4.6rem] -top-2 h-8 w-8 sm:left-[5.1rem]">
+        <path d="M20 9 Q21 3 26 2" stroke="#15803d" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+        <ellipse cx="12" cy="23" rx="9" ry="11" fill="#ea580c" /><ellipse cx="28" cy="23" rx="9" ry="11" fill="#ea580c" /><ellipse cx="20" cy="23" rx="8" ry="12" fill="#f97316" />
+        <path d="M13 19 L16 23 L10 23 Z M27 19 L30 23 L24 23 Z" fill="#1c1917" />
+        <path d="M12 29 L16 27 L20 30 L24 27 L28 29 L24 33 L20 31 L16 33 Z" fill="#1c1917" />
+      </svg>
+    </div>
+  );
+}
+
 function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleTheme: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuthStore();
@@ -245,7 +272,8 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <Link to="/catalog" className="flex items-center gap-2 sm:gap-3">
+        <Link to="/catalog" className="relative flex items-center gap-2 pl-12 sm:gap-3 sm:pl-14">
+          <HalloweenDecor />
           <img src={logoSpeedshift} alt="SpeedShift" className="h-9 w-9 rounded-full object-cover sm:h-10 sm:w-10" />
           <div>
             <div className="font-display text-2xl uppercase leading-none text-white sm:text-3xl">SpeedShift</div>

@@ -107,3 +107,12 @@ html[data-theme='light'] select {
 .card-surface {
   @apply border border-white/10 bg-[#121416] shadow-soft;
 }
+
+@keyframes spiderSwing {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*='spiderSwing'] { animation: none !important; }
+}
