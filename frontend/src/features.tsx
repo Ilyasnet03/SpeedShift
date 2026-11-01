@@ -13,6 +13,7 @@ import {
   getConversations,
   getListing,
   getSellerReviews,
+  getUnreadCount,
   recordListingEvent,
   reportListing,
   resolveAdminReport,
@@ -363,7 +364,7 @@ export function ComparePage() {
 export function useUnreadCount(enabled: boolean, userEmail?: string) {
   return useQuery({
     queryKey: ['unread-count', userEmail],
-    queryFn: async () => (await import('./services/api')).getUnreadCount(),
+    queryFn: () => getUnreadCount(),
     enabled,
     refetchInterval: 10000,
     refetchIntervalInBackground: true

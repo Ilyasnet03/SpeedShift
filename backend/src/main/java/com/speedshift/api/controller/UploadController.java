@@ -1,6 +1,7 @@
 package com.speedshift.api.controller;
 
 import com.speedshift.api.service.CloudinaryService;
+import com.speedshift.api.service.ImageUtils;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,11 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.imageio.ImageIO;
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
@@ -88,23 +85,10 @@ public class UploadController {
     }
 
     private byte[] encode(BufferedImage image) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        ImageIO.write(image, "jpg", output);
-        return output.toByteArray();
+        return ImageUtils.encode(image);
     }
 
-    // Always returns an RGB image so JPEG encoding works for PNG/WebP sources with alpha.
     private BufferedImage scale(BufferedImage source, int maxSide) {
-        double ratio = Math.min(1.0, (double) maxSide / Math.max(source.getWidth(), source.getHeight()));
-        int width = Math.max(1, (int) Math.round(source.getWidth() * ratio));
-        int height = Math.max(1, (int) Math.round(source.getHeight() * ratio));
-        BufferedImage target = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        Graphics2D graphics = target.createGraphics();
-        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        graphics.setColor(Color.WHITE);
-        graphics.fillRect(0, 0, width, height);
-        graphics.drawImage(source, 0, 0, width, height, null);
-        graphics.dispose();
-        return target;
+        return ImageUtils.scale(source, maxSide);
     }
 }
