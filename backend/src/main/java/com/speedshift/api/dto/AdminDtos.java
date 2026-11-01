@@ -74,6 +74,27 @@ public final class AdminDtos {
         LocalDateTime visitedAt
     ) {}
 
+    public record SellerCount(String sellerName, long listings) {}
+
+    public record AdminOverview(
+        long reservedListings,
+        long soldListings,
+        long archivedListings,
+        long expiredListings,
+        long expiringSoonListings,
+        long newListingsLast7Days,
+        long newUsersLast7Days,
+        long openReports,
+        long totalReports,
+        long conversations,
+        long messages,
+        long views30Days,
+        long whatsapp30Days,
+        long calls30Days,
+        long shares30Days,
+        List<SellerCount> topSellers
+    ) {}
+
     public record UserActivity(
         Long userId,
         String firstName,

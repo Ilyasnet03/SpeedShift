@@ -299,6 +299,29 @@ export type CreateListingPayload = {
   showPhone?: boolean;
 };
 
+export type AdminOverview = {
+  reservedListings: number;
+  soldListings: number;
+  archivedListings: number;
+  expiredListings: number;
+  expiringSoonListings: number;
+  newListingsLast7Days: number;
+  newUsersLast7Days: number;
+  openReports: number;
+  totalReports: number;
+  conversations: number;
+  messages: number;
+  views30Days: number;
+  whatsapp30Days: number;
+  calls30Days: number;
+  shares30Days: number;
+  topSellers: { sellerName: string; listings: number }[];
+};
+
+export async function getAdminOverview() {
+  return request<AdminOverview>('/admin/overview');
+}
+
 export type AdminDashboardStats = {
   totalUsers: number;
   activeUsers: number;

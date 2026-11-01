@@ -8,6 +8,8 @@ import com.speedshift.api.dto.AdminDtos.ListingViewSummary;
 import com.speedshift.api.dto.AdminDtos.RoleUpdate;
 import com.speedshift.api.dto.AdminDtos.SiteVisitSummary;
 import com.speedshift.api.dto.AdminDtos.ActivityStats;
+import com.speedshift.api.dto.AdminDtos.AdminOverview;
+import com.speedshift.api.service.AdminOverviewService;
 import com.speedshift.api.repository.SiteVisitRepository;
 import com.speedshift.api.repository.VisitorActivityRepository;
 import com.speedshift.api.repository.ListingViewRepository;
@@ -40,12 +42,20 @@ public class AdminController {
 
     private final VisitorActivityRepository activityRepository;
 
-    public AdminController(AdminService adminService, ListingViewRepository listingViewRepository, SiteVisitRepository siteVisitRepository, AuditService auditService, VisitorActivityRepository activityRepository) {
+    private final AdminOverviewService overviewService;
+
+    public AdminController(AdminService adminService, ListingViewRepository listingViewRepository, SiteVisitRepository siteVisitRepository, AuditService auditService, VisitorActivityRepository activityRepository, AdminOverviewService overviewService) {
+        this.overviewService = overviewService;
         this.adminService = adminService;
         this.listingViewRepository = listingViewRepository;
         this.siteVisitRepository = siteVisitRepository;
         this.auditService = auditService;
         this.activityRepository = activityRepository;
+    }
+
+    @GetMapping("/overview")
+    public AdminOverview getOverview() {
+        return overviewService.getOverview();
     }
 
     @GetMapping("/activity")

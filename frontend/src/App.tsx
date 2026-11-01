@@ -35,6 +35,7 @@ import {
   getAdminListingViews,
   getAdminSiteVisits,
   getAdminActivity,
+  getAdminOverview,
   startHeartbeat,
   trackVisit,
   getAdminStats,
@@ -64,6 +65,7 @@ import {
   type AdminListingView,
   type AdminSiteVisit,
   type AdminActivityStats,
+  type AdminOverview,
   type CreateListingPayload
 } from './services/api';
 import { useAuthStore } from './store/authStore';
@@ -1689,15 +1691,15 @@ function LoginPage() {
   );
 }
 
-function DashboardOverview({ stats, users, listings, views, visits, activity, onModerate, onOpen }: {
+function DashboardOverview({ stats, overview, users, listings, views, visits, activity, onOpen }: {
   stats: AdminDashboardStats;
+  overview?: AdminOverview;
   users: AdminUser[];
   listings: AdminListing[];
   views: AdminListingView[];
   visits: AdminSiteVisit[];
   activity?: AdminActivityStats;
-  onModerate: (id: number, status: AdminListingStatus) => void;
-  onOpen: (section: 'users' | 'listings' | 'views' | 'visits') => void;
+  onOpen: (section: 'users' | 'listings' | 'views' | 'visits' | 'reports') => void;
 }) {
   const dayKey = (value: string | null) => (value ? new Date(value).toISOString().slice(0, 10) : '');
   const today = new Date().toISOString().slice(0, 10);
@@ -1711,7 +1713,6 @@ function DashboardOverview({ stats, users, listings, views, visits, activity, on
   const uniqueVisitors = new Set(visits.map((visit) => visit.visitorId)).size;
   const anonymousVisitors = new Set(visits.filter((visit) => visit.userId == null).map((visit) => visit.visitorId)).size;
   const visitsToday = visits.filter((visit) => dayKey(visit.visitedAt) === today);
-  const pending = listings.filter((listing) => listing.status === 'PENDING');
   const admins = users.filter((user) => user.role === 'ADMIN').length;
 
   const countBy = <T,>(items: T[], key: (item: T) => string) => {
@@ -1728,9 +1729,12 @@ function DashboardOverview({ stats, users, listings, views, visits, activity, on
 
   const kpis: [string, string | number, string][] = [
     ['Utilisateurs', stats.totalUsers, `${stats.activeUsers} actifs · ${stats.disabledUsers} suspendus · ${admins} admin`],
-    ['Nouveaux (30 j)', stats.newUsersLast30Days, 'Inscriptions récentes'],
-    ['Annonces', stats.totalListings, `${stats.publishedListings} publiées · ${stats.rejectedListings} refusées`],
-    ['À valider', stats.pendingListings, 'Annonces en attente'],
+    ['Nouveaux (30 j)', stats.newUsersLast30Days, `${overview?.newUsersLast7Days ?? 0} sur les 7 derniers jours`],
+    ['Annonces', stats.totalListings, `${stats.publishedListings} publiées · ${overview?.newListingsLast7Days ?? 0} nouvelles (7 j)`],
+    ['Réservées / Vendues', `${overview?.reservedListings ?? 0} / ${overview?.soldListings ?? 0}`, `${overview?.archivedListings ?? 0} archivées`],
+    ['Expiration', overview?.expiringSoonListings ?? 0, `expirent sous 3 j · ${overview?.expiredListings ?? 0} expirées`],
+    ['Signalements ouverts', overview?.openReports ?? 0, `${overview?.totalReports ?? 0} au total`],
+    ['Conversations', overview?.conversations ?? 0, `${overview?.messages ?? 0} messages échangés`],
     ['Prix moyen', formatPrice(stats.averagePublishedPrice), 'Annonces publiées'],
     ['Visiteurs uniques', uniqueVisitors, `${anonymousVisitors} anonymes · ${visitsToday.length} visites aujourd'hui`],
     ['Visites enregistrées', visits.length, 'Dernières 500 pages vues'],
@@ -1793,18 +1797,20 @@ function DashboardOverview({ stats, users, listings, views, visits, activity, on
 
       <div className="grid gap-6 lg:grid-cols-2">
         <article className={card}>
-          <div className="flex items-center justify-between"><h2 className="font-display text-2xl uppercase text-white">À modérer ({pending.length})</h2><button type="button" onClick={() => onOpen('listings')} className="text-xs uppercase tracking-[0.2em] text-ember">Tout voir</button></div>
+          <h2 className="font-display text-2xl uppercase text-white">Engagement (30 jours)</h2>
           <ul className="mt-4 space-y-3">
-            {pending.slice(0, 5).map((listing) => (
-              <li key={listing.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-3">
-                <div className="min-w-0"><Link to={`/listing/${listing.id}`} className="block truncate text-sm text-white hover:text-ember">{listing.title}</Link><span className="text-xs text-stone">{listing.sellerName ?? '—'} · {formatPrice(listing.price)}</span></div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => onModerate(listing.id, 'PUBLISHED')} className="rounded-full bg-ember px-3 py-1 text-xs text-white">Publier</button>
-                  <button type="button" onClick={() => onModerate(listing.id, 'REJECTED')} className="rounded-full border border-white/10 px-3 py-1 text-xs text-stone hover:text-white">Refuser</button>
-                </div>
-              </li>
+            {(() => {
+              const rows: [string, number][] = [['Vues d\'annonces', overview?.views30Days ?? 0], ['Clics WhatsApp', overview?.whatsapp30Days ?? 0], ['Appels', overview?.calls30Days ?? 0], ['Partages', overview?.shares30Days ?? 0]];
+              const max = Math.max(1, ...rows.map(([, n]) => n));
+              return rows.map(([label, n]) => bar(label, n, max));
+            })()}
+          </ul>
+          <h3 className="mt-6 text-xs uppercase tracking-[0.2em] text-stone/70">Top vendeurs</h3>
+          <ul className="mt-3 space-y-2">
+            {(overview?.topSellers ?? []).map((seller) => (
+              <li key={seller.sellerName} className="flex justify-between gap-3 text-sm"><span className="truncate text-white">{seller.sellerName}</span><span className="text-stone">{seller.listings} annonce{seller.listings > 1 ? 's' : ''}</span></li>
             ))}
-            {pending.length === 0 && <li className="text-sm text-stone">Aucune annonce en attente.</li>}
+            {!overview?.topSellers.length && <li className="text-sm text-stone">Aucune donnée.</li>}
           </ul>
         </article>
         <article className={card}>
@@ -1885,6 +1891,7 @@ function AdminPage() {
   const usersQuery = useQuery({ queryKey: ['admin', 'users'], queryFn: getAdminUsers, enabled: section === 'users' || section === 'stats' });
   const listingsQuery = useQuery({ queryKey: ['admin', 'listings'], queryFn: getAdminListings, enabled: section === 'listings' || section === 'stats' });
   const [period, setPeriod] = useState<Period>('month');
+  const overviewQuery = useQuery({ queryKey: ['admin', 'overview'], queryFn: getAdminOverview, enabled: section === 'stats' });
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const range = periodRange(period, customFrom, customTo);
@@ -1923,12 +1930,7 @@ function AdminPage() {
   });
 
   const mutationError = enabledMutation.isError || roleMutation.isError || deleteUserMutation.isError || listingMutation.isError;
-  const pendingListings = (listingsQuery.data ?? []).filter((listing) => listing.status === 'PENDING');
-  const validatePending = async () => {
-    if (pendingListings.length === 0 || !window.confirm(`Publier les ${pendingListings.length} annonce(s) en attente ?`)) return;
-    await Promise.all(pendingListings.map((listing) => setAdminListingStatus(listing.id, 'PUBLISHED')));
-    await refreshAdminData();
-  };
+  const reportsCount = overviewQuery.data?.openReports ?? 0;
   const exportCsv = () => {
     const stats = statsQuery.data;
     const cell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
@@ -1936,7 +1938,7 @@ function AdminPage() {
       ['Période', range.from, range.to],
       ['Utilisateurs', stats?.totalUsers ?? ''],
       ['Annonces', stats?.totalListings ?? ''],
-      ['Annonces en attente', stats?.pendingListings ?? ''],
+      ['Signalements ouverts', overviewQuery.data?.openReports ?? ''],
       ['Visiteurs', activityQuery.data?.visitors ?? ''],
       ['Temps moyen par visiteur (s)', activityQuery.data?.averageSecondsPerVisitor ?? ''],
       [],
@@ -1996,7 +1998,7 @@ function AdminPage() {
             </div>
           )}
           <div className="flex flex-wrap gap-3">
-            <button type="button" disabled={pendingListings.length === 0} onClick={() => void validatePending()} className="rounded-full bg-ember px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Valider les annonces en attente ({pendingListings.length})</button>
+            <button type="button" onClick={() => setSection('reports')} className="rounded-full bg-ember px-4 py-2 text-sm font-medium text-white">Signalements ouverts ({reportsCount})</button>
             <button type="button" onClick={exportCsv} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">Exporter CSV</button>
             <button type="button" onClick={() => window.print()} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">Exporter PDF</button>
             <button type="button" onClick={() => setSection('reports')} className="rounded-full border border-white/10 px-4 py-2 text-sm text-white">Gérer les utilisateurs signalés</button>
@@ -2008,12 +2010,12 @@ function AdminPage() {
         statsQuery.isLoading ? <LoadingPanel /> : statsQuery.isError || !statsQuery.data ? <ErrorPanel error={statsQuery.error} onRetry={() => statsQuery.refetch()} /> : (
           <DashboardOverview
             stats={statsQuery.data}
+            overview={overviewQuery.data}
             users={usersQuery.data ?? []}
             listings={listingsQuery.data ?? []}
             views={periodViews}
             visits={periodVisits}
             activity={activityQuery.data}
-            onModerate={(id, status) => listingMutation.mutate({ id, status })}
             onOpen={setSection}
           />
         )
