@@ -783,12 +783,8 @@ function CatalogPage() {
     queryFn: () => getListings(category, appliedCity, appliedQuery, sort)
   });
 
-  if (isLoading || !data) {
-    if (!isLoading) return <ErrorPanel />;
-    return <LoadingPanel />;
-  }
-
   const { filtered, recentCount } = useMemo(() => {
+    if (!data) return { filtered: [] as any[], recentCount: 0 };
     const now = Date.now();
     const isRecent = (item: any) => item.createdAt && now - new Date(item.createdAt).getTime() < 24 * 60 * 60 * 1000;
     const filteredItems = data.filter((item: any) => {
@@ -821,6 +817,11 @@ function CatalogPage() {
   }, [data, filters, near, radius, sort]);
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const filterInput = 'w-full rounded-xl border border-white/10 bg-black/20 p-3 text-white placeholder:text-stone/60';
+
+  if (isLoading || !data) {
+    if (!isLoading) return <ErrorPanel />;
+    return <LoadingPanel />;
+  }
 
   return (
     <div className="space-y-8">
