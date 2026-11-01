@@ -67,7 +67,6 @@ import { useAuthStore } from './store/authStore';
 import { useFavoritesStore } from './store/favoritesStore';
 import { useCompareStore } from './store/compareStore';
 import { useT } from './lib/i18n';
-import { coordsForCity, distanceKm, type Coords } from './lib/cities';
 import { CityCombobox } from './CityCombobox';
 import {
   AdminAnalyticsTab,
@@ -764,19 +763,6 @@ function CatalogPage() {
   const [filters, setFilters] = useState(emptyFilters);
   const setFilter = (field: keyof typeof emptyFilters, value: string) => setFilters((previous) => ({ ...previous, [field]: value }));
   const t = useT();
-  const [near, setNear] = useState<Coords | null>(null);
-  const [radius, setRadius] = useState(100);
-  const [geoError, setGeoError] = useState('');
-  const locate = () => {
-    if (near) { setNear(null); return; }
-    setGeoError('');
-    if (!navigator.geolocation) { setGeoError('Localisation indisponible.'); return; }
-    navigator.geolocation.getCurrentPosition(
-      (position) => setNear({ lat: position.coords.latitude, lng: position.coords.longitude }),
-      (error) => setGeoError(error.code === 1 ? 'Autorisez la localisation dans votre navigateur (cadenas de la barre d’adresse), puis réessayez.' : 'Position introuvable. Vérifiez que la localisation de l’appareil est activée.'),
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
-    );
-  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['listings', { category, query: appliedQuery, city: appliedCity, sort }],
@@ -797,24 +783,16 @@ function CatalogPage() {
       if (filters.fuel && !String(item.fuel ?? '').toLowerCase().startsWith(filters.fuel.toLowerCase().slice(0, 4))) return false;
       if (filters.transmission && !String(item.transmission ?? '').toLowerCase().startsWith(filters.transmission.toLowerCase().slice(0, 4))) return false;
       if (filters.availability && item.availability !== filters.availability) return false;
-      if (near) {
-        const coords = coordsForCity(item.city);
-        if (!coords || distanceKm(near, coords) > radius) return false;
-      }
       return true;
     });
 
-    const distances: Map<any, number> | undefined = near
-      ? new Map(filteredItems.map((item: any) => [item.id, distanceKm(near, coordsForCity(item.city)!)]))
-      : undefined;
     const sortedItems = filteredItems.sort((a: any, b: any) => {
-      if (distances) return distances.get(a.id)! - distances.get(b.id)!;
       if (sort !== 'featured') return 0;
       return Number(isRecent(b) ? 1 : 0) - Number(isRecent(a) ? 1 : 0) || (isRecent(a) && isRecent(b) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0);
     });
 
     return { filtered: sortedItems, recentCount: sortedItems.filter(isRecent).length };
-  }, [data, filters, near, radius, sort]);
+  }, [data, filters, sort]);
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const filterInput = 'w-full rounded-xl border border-white/10 bg-black/20 p-3 text-white placeholder:text-stone/60';
 
@@ -852,10 +830,6 @@ function CatalogPage() {
                 <option value="">Toutes</option>
                 {['Motos', 'Voitures', 'Jet Skis', 'Quads', 'Pièces & Accessoires'].map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
-            </label>
-            <label className="block space-y-2">
-              <span>Ville</span>
-              <CityCombobox value={city} onChange={(next) => { setCity(next); setSearchParams((previous) => { const params = new URLSearchParams(previous); next ? params.set('city', next) : params.delete('city'); return params; }); }} placeholder="Rechercher une ville…" className="bg-black/20" />
             </label>
             <div className="space-y-2">
               <span>Prix (DH)</span>
@@ -909,15 +883,8 @@ function CatalogPage() {
         <div className="space-y-5">
           <div className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#121416] px-4 py-3">
             <div className="text-sm text-stone/80">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={locate} aria-pressed={Boolean(near)} className={`inline-flex items-center gap-1 rounded-full border px-3 py-2 text-sm ${near ? 'border-ember bg-ember text-white' : 'border-white/10 text-white'}`}>
-                <MapPin size={14} /> {t('Près de moi')}
-              </button>
-              {near && (
-                <select value={radius} onChange={(event) => setRadius(Number(event.target.value))} aria-label={t('Rayon')} className="rounded-full border border-white/10 bg-[#0b0c0e] px-3 py-2 text-sm text-white">
-                  {[25, 50, 100, 200, 500].map((value) => <option key={value} value={value}>{value} km</option>)}
-                </select>
-              )}
+            <div className="w-56">
+              <CityCombobox value={city} onChange={(next) => { setCity(next); setSearchParams((previous) => { const params = new URLSearchParams(previous); next ? params.set('city', next) : params.delete('city'); return params; }); }} placeholder="Choisir une ville…" className="bg-[#0b0c0e]" />
             </div>
             <select value={sort} onChange={(e) => setSort(e.target.value)} className="rounded-full border border-white/10 bg-[#0b0c0e] px-3 py-2 text-sm text-white">
               <option value="featured">À la une</option>
@@ -932,8 +899,6 @@ function CatalogPage() {
               <Zap size={16} className="text-ember" /> Annonces récentes affichées en premier — {recentCount} publiée{recentCount > 1 ? 's' : ''} il y a moins de 24 h
             </p>
           )}
-          {geoError && <p className="text-sm text-red-300">{t(geoError)}</p>}
-          {near && filtered.length === 0 && <p className="text-sm text-amber-300">Aucune annonce dans un rayon de {radius} km. Augmentez le rayon.</p>}
           <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
             {filtered.map((item: any) => (
               <ListingCard key={item.id} listing={item} compact />
