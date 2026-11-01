@@ -1691,6 +1691,65 @@ function LoginPage() {
   );
 }
 
+const chartColors = ['#ff5a1f', '#38bdf8', '#34d399', '#fbbf24', '#a78bfa', '#f472b6', '#94a3b8'];
+
+function DonutChart({ data, centerLabel }: { data: [string, number][]; centerLabel?: string }) {
+  const items = data.filter(([, value]) => value > 0);
+  const total = items.reduce((sum, [, value]) => sum + value, 0);
+  const radius = 40;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+  return (
+    <div className="flex flex-col items-center gap-5 sm:flex-row">
+      <div className="relative h-36 w-36 shrink-0">
+        <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label={items.map(([label, value]) => `${label} : ${value}`).join(', ') || 'Aucune donnée'}>
+          <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="14" />
+          {items.map(([label, value], index) => {
+            const length = (value / total) * circumference;
+            const segment = <circle key={label} cx="50" cy="50" r={radius} fill="none" stroke={chartColors[index % chartColors.length]} strokeWidth="14" strokeDasharray={`${length} ${circumference - length}`} strokeDashoffset={-offset} />;
+            offset += length;
+            return segment;
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="font-display text-3xl text-white">{total}</span>
+          {centerLabel && <span className="text-[10px] uppercase tracking-[0.2em] text-stone/70">{centerLabel}</span>}
+        </div>
+      </div>
+      <ul className="w-full space-y-2 text-sm">
+        {items.length === 0 && <li className="text-stone">Aucune donnée.</li>}
+        {items.map(([label, value], index) => (
+          <li key={label} className="flex items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-2 text-white"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: chartColors[index % chartColors.length] }} /><span className="truncate">{label}</span></span>
+            <span className="shrink-0 text-stone">{value} · {Math.round((value / total) * 100)} %</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function AreaChart({ labels, values }: { labels: string[]; values: number[] }) {
+  const width = 600;
+  const height = 160;
+  const max = Math.max(1, ...values);
+  const step = values.length > 1 ? width / (values.length - 1) : width;
+  const points = values.map((value, index) => [index * step, height - (value / max) * (height - 16) - 4] as const);
+  const line = points.map(([x, y]) => `${x},${y}`).join(' ');
+  return (
+    <div>
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-44 w-full text-ember" role="img" aria-label="Courbe des visites">
+        {[0.25, 0.5, 0.75].map((ratio) => <line key={ratio} x1="0" x2={width} y1={height * ratio} y2={height * ratio} stroke="rgba(255,255,255,0.06)" />)}
+        <polygon points={`0,${height} ${line} ${width},${height}`} fill="currentColor" opacity="0.18" />
+        <polyline points={line} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        {points.map(([x, y], index) => <circle key={labels[index]} cx={x} cy={y} r="3" fill="currentColor" vectorEffect="non-scaling-stroke"><title>{`${labels[index]} : ${values[index]}`}</title></circle>)}
+      </svg>
+      <div className="mt-2 flex justify-between text-[10px] text-stone/60">{labels.map((label, index) => <span key={label} className={index % 2 ? 'hidden sm:inline' : ''}>{label.slice(8)}</span>)}</div>
+      <div className="mt-1 text-xs text-stone/70">Pic : {max} visite{max > 1 ? 's' : ''} · Total : {values.reduce((a, b) => a + b, 0)}</div>
+    </div>
+  );
+}
+
 function DashboardOverview({ stats, overview, users, listings, views, visits, activity, onOpen }: {
   stats: AdminDashboardStats;
   overview?: AdminOverview;
@@ -1750,29 +1809,66 @@ function DashboardOverview({ stats, overview, users, listings, views, visits, ac
   );
 
   return (
-    <section aria-label="Dashboard" className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map(([label, value, hint]) => (
-          <article key={label} className={card}>
-            <h2 className="text-xs uppercase tracking-[0.2em] text-stone/70">{label}</h2>
-            <p className="mt-2 font-display text-4xl uppercase text-white">{value}</p>
-            <p className="mt-1 text-xs text-stone/70">{hint}</p>
-          </article>
-        ))}
-      </div>
+    <section aria-label="Dashboard" className="space-y-8">
+      {([['Communauté', [0, 1, 6, 5]], ['Annonces', [2, 3, 4, 7]], ['Audience', [8, 9, 10, 11]]] as [string, number[]][]).map(([group, indexes]) => (
+        <div key={group} className="space-y-3">
+          <h2 className="text-xs uppercase tracking-[0.28em] text-ember">{group}</h2>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {indexes.map((index) => {
+              const [label, value, hint] = kpis[index];
+              return (
+                <article key={label} className={`${card} border-t-2 border-t-ember/60`}>
+                  <h3 className="text-xs uppercase tracking-[0.2em] text-stone/70">{label}</h3>
+                  <p className="mt-2 font-display text-4xl uppercase text-white">{value}</p>
+                  <p className="mt-1 text-xs text-stone/70">{hint}</p>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      ))}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <article className={`${card} lg:col-span-2`}>
           <h2 className="font-display text-2xl uppercase text-white">Visites — 14 derniers jours</h2>
-          <div className="mt-5 flex h-40 items-end gap-2">
-            {visitsByDay.map((items, index) => (
-              <div key={days[index]} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${days[index]} : ${items.length}`}>
-                <span className="text-[10px] text-stone">{items.length}</span>
-                <div className="w-full rounded-t bg-ember" style={{ height: `${Math.max(4, (items.length / maxDay) * 100)}%` }} />
-                <span className="text-[9px] text-stone/60">{days[index].slice(8)}</span>
-              </div>
-            ))}
-          </div>
+          <div className="mt-5"><AreaChart labels={days} values={visitsByDay.map((items) => items.length)} /></div>
+        </article>
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Visiteurs</h2>
+          <div className="mt-5"><DonutChart centerLabel="visiteurs" data={[['Connectés', Math.max(uniqueVisitors - anonymousVisitors, 0)], ['Anonymes', anonymousVisitors]]} /></div>
+        </article>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Statut des annonces</h2>
+          <div className="mt-5"><DonutChart centerLabel="annonces" data={[
+            ['En ligne', Math.max(stats.publishedListings - (overview?.expiredListings ?? 0), 0)],
+            ['Expirées', overview?.expiredListings ?? 0],
+            ['Réservées', overview?.reservedListings ?? 0],
+            ['Vendues', overview?.soldListings ?? 0],
+            ['Archivées', overview?.archivedListings ?? 0],
+            ['Refusées', stats.rejectedListings]
+          ]} /></div>
+        </article>
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Annonces par catégorie</h2>
+          <div className="mt-5"><DonutChart centerLabel="annonces" data={byCategory as [string, number][]} /></div>
+        </article>
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Comptes utilisateurs</h2>
+          <div className="mt-5"><DonutChart centerLabel="comptes" data={[['Actifs', Math.max(stats.activeUsers - admins, 0)], ['Admins', admins], ['Suspendus', stats.disabledUsers]]} /></div>
+        </article>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Engagement (30 jours)</h2>
+          <div className="mt-5"><DonutChart centerLabel="actions" data={[['Vues', overview?.views30Days ?? 0], ['WhatsApp', overview?.whatsapp30Days ?? 0], ['Appels', overview?.calls30Days ?? 0], ['Partages', overview?.shares30Days ?? 0]]} /></div>
+        </article>
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Annonces par ville</h2>
+          <ul className="mt-4 space-y-3">{byCity.length ? byCity.map(([k, n]) => bar(k, n, byCity[0][1])) : <li className="text-sm text-stone">Aucune donnée.</li>}</ul>
         </article>
         <article className={card}>
           <h2 className="font-display text-2xl uppercase text-white">Pages les plus vues</h2>
@@ -1780,39 +1876,20 @@ function DashboardOverview({ stats, overview, users, listings, views, visits, ac
         </article>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <article className={card}>
-          <h2 className="font-display text-2xl uppercase text-white">Annonces par catégorie</h2>
-          <ul className="mt-4 space-y-3">{byCategory.length ? byCategory.map(([k, n]) => bar(k, n, byCategory[0][1])) : <li className="text-sm text-stone">Aucune donnée.</li>}</ul>
-        </article>
-        <article className={card}>
-          <h2 className="font-display text-2xl uppercase text-white">Annonces par ville</h2>
-          <ul className="mt-4 space-y-3">{byCity.length ? byCity.map(([k, n]) => bar(k, n, byCity[0][1])) : <li className="text-sm text-stone">Aucune donnée.</li>}</ul>
-        </article>
+      <div className="grid gap-6 lg:grid-cols-2">
         <article className={card}>
           <h2 className="font-display text-2xl uppercase text-white">Annonces les plus consultées</h2>
           <ul className="mt-4 space-y-3">{topViewed.length ? topViewed.map(([k, n]) => bar(k.split('|')[1], n, topViewed[0][1])) : <li className="text-sm text-stone">Aucune donnée.</li>}</ul>
         </article>
+        <article className={card}>
+          <h2 className="font-display text-2xl uppercase text-white">Top vendeurs</h2>
+          <ul className="mt-4 space-y-3">
+            {(overview?.topSellers ?? []).length ? (overview?.topSellers ?? []).map((seller) => bar(seller.sellerName, seller.listings, overview?.topSellers[0].listings ?? 1)) : <li className="text-sm text-stone">Aucune donnée.</li>}
+          </ul>
+        </article>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <article className={card}>
-          <h2 className="font-display text-2xl uppercase text-white">Engagement (30 jours)</h2>
-          <ul className="mt-4 space-y-3">
-            {(() => {
-              const rows: [string, number][] = [['Vues d\'annonces', overview?.views30Days ?? 0], ['Clics WhatsApp', overview?.whatsapp30Days ?? 0], ['Appels', overview?.calls30Days ?? 0], ['Partages', overview?.shares30Days ?? 0]];
-              const max = Math.max(1, ...rows.map(([, n]) => n));
-              return rows.map(([label, n]) => bar(label, n, max));
-            })()}
-          </ul>
-          <h3 className="mt-6 text-xs uppercase tracking-[0.2em] text-stone/70">Top vendeurs</h3>
-          <ul className="mt-3 space-y-2">
-            {(overview?.topSellers ?? []).map((seller) => (
-              <li key={seller.sellerName} className="flex justify-between gap-3 text-sm"><span className="truncate text-white">{seller.sellerName}</span><span className="text-stone">{seller.listings} annonce{seller.listings > 1 ? 's' : ''}</span></li>
-            ))}
-            {!overview?.topSellers.length && <li className="text-sm text-stone">Aucune donnée.</li>}
-          </ul>
-        </article>
         <article className={card}>
           <div className="flex items-center justify-between"><h2 className="font-display text-2xl uppercase text-white">Derniers inscrits</h2><button type="button" onClick={() => onOpen('users')} className="text-xs uppercase tracking-[0.2em] text-ember">Tout voir</button></div>
           <ul className="mt-4 space-y-3">
