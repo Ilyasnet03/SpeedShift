@@ -378,14 +378,18 @@ export function MessageNotifier({ icon }: { icon?: string }) {
   const { data: unread } = useUnreadCount(Boolean(user), user?.email);
   const previousCount = useRef<number | null>(null);
   const [toast, setToast] = useState<{ id: number; title: string; body: string } | null>(null);
-
-  // Browsers only allow the permission prompt after a user gesture.
+  const [dismissedPrompt, setDismissedPrompt] = useState(() => sessionStorage.getItem('notif-prompt-dismissed') === '1');
   useEffect(() => {
-    if (!user || !('Notification' in window) || Notification.permission !== 'default') return;
-    const ask = () => void Notification.requestPermission();
-    window.addEventListener('pointerdown', ask, { once: true });
-    return () => window.removeEventListener('pointerdown', ask);
-  }, [user]);
+    if (dismissedPrompt) sessionStorage.setItem('notif-prompt-dismissed', '1');
+  }, [dismissedPrompt]);
+
+  useEffect(() => {
+    if (!('Notification' in window)) return;
+    const sync = () => setPermission(Notification.permission);
+    window.addEventListener('focus', sync);
+    window.addEventListener('click', sync);
+    return () => { window.removeEventListener('focus', sync); window.removeEventListener('click', sync); };
+  }, []);
 
   useEffect(() => {
     if (!user || unread?.count === undefined) {
@@ -428,6 +432,30 @@ export function MessageNotifier({ icon }: { icon?: string }) {
     const base = document.title.replace(/^\(\d+\)\s*/, '');
     document.title = unread?.count ? `(${unread.count}) ${base}` : base;
   }, [unread?.count]);
+
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
+  );
+  const showPrompt = Boolean(user) && !toast && (permission === 'default' || permission === 'denied') && !dismissedPrompt;
+
+  if (showPrompt) {
+    return (
+      <div className="fixed bottom-4 left-4 right-4 z-[60] max-w-sm rounded-2xl border border-ember/40 bg-[#121416] p-4 shadow-2xl sm:right-auto">
+        <div className="flex items-center gap-2 text-sm font-semibold text-white"><MessageCircle size={16} className="text-ember" />Notifications de messages</div>
+        <div className="mt-1 text-sm text-stone">
+          {permission === 'denied'
+            ? 'Les notifications sont bloquées. Cliquez sur le cadenas à gauche de l’adresse du site, puis autorisez « Notifications ».'
+            : 'Activez les notifications pour être prévenu dès que vous recevez un message.'}
+        </div>
+        <div className="mt-3 flex gap-2">
+          {permission === 'default' && (
+            <button type="button" onClick={() => void Notification.requestPermission().then(setPermission)} className="rounded-full bg-ember px-4 py-2 text-sm font-medium text-white">Activer</button>
+          )}
+          <button type="button" onClick={() => setDismissedPrompt(true)} className="rounded-full border border-white/10 px-4 py-2 text-sm text-stone hover:text-white">Plus tard</button>
+        </div>
+      </div>
+    );
+  }
 
   if (!toast) return null;
   return (
