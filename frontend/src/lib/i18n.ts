@@ -8,6 +8,12 @@ export const LANGS: { code: Lang; label: string }[] = [
 ];
 
 const en: Record<string, string> = {
+  'Accueil': 'Home',
+  'Recherche': 'Search',
+  'Publier': 'Post',
+  'Compte': 'Account',
+  'Navigation rapide': 'Quick navigation',
+  'messages non lus': 'unread messages',
   'Favoris': 'Favorites',
   'Market': 'Market',
   'Mes annonces': 'My listings',
@@ -90,6 +96,12 @@ const en: Record<string, string> = {
 };
 
 const ar: Record<string, string> = {
+  'Accueil': 'الرئيسية',
+  'Recherche': 'بحث',
+  'Publier': 'نشر',
+  'Compte': 'حسابي',
+  'Navigation rapide': 'التنقل السريع',
+  'messages non lus': 'رسائل غير مقروءة',
   'Favoris': 'المفضلة',
   'Market': 'السوق',
   'Mes annonces': 'إعلاناتي',

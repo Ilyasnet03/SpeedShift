@@ -9,15 +9,19 @@ import {
   SlidersHorizontal,
   ChevronRight,
   Gauge,
+  Home,
   MapPin,
   ArrowLeft,
   Menu,
+  MessageSquare,
+  Plus,
   Search,
   ShieldCheck,
   Star,
   Sun,
   Moon,
   TrendingUp,
+  UserRound,
   Users,
   Zap
 } from 'lucide-react';
@@ -174,7 +178,7 @@ function App() {
   }, [theme]);
 
   return (
-    <div className="min-h-screen bg-carbon text-stone">
+    <div className="app-shell min-h-screen bg-carbon text-stone">
       <Header theme={theme} onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />
       <MessageNotifier icon={logoSpeedshift} />
       <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
@@ -182,6 +186,7 @@ function App() {
           <Route path="/" element={<Navigate to="/catalog" replace />} />
           <Route path="/accueil" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />
           <Route path="/marketplace" element={<Navigate to="/catalog" replace />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/favorites" element={<RequireAuth><FavoritesPage /></RequireAuth>} />
@@ -201,6 +206,74 @@ function App() {
       </main>
       <Footer />
       <CompareBar />
+      <BottomNavigation />
+    </div>
+  );
+}
+
+function enableMessageNotifications() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    void Notification.requestPermission();
+  }
+}
+
+function BottomNavigation() {
+  const user = useAuthStore((state) => state.user);
+  const { data: unread } = useUnreadCount(Boolean(user), user?.email);
+  const location = useLocation();
+  const t = useT();
+  const isSearching = location.pathname === '/catalog' && new URLSearchParams(location.search).has('search');
+  const items = [
+    { label: 'Accueil', to: '/catalog', icon: Home, active: (location.pathname === '/catalog' && !isSearching) || location.pathname === '/accueil' },
+    { label: 'Recherche', to: '/catalog?search=1', icon: Search, active: isSearching },
+    { label: 'Publier', to: '/sell', icon: Plus, active: location.pathname === '/sell' || /^\/listing\/[^/]+\/edit$/.test(location.pathname) },
+    { label: 'Messages', to: '/messages', icon: MessageSquare, active: location.pathname === '/messages' || location.pathname.startsWith('/messages/') },
+    { label: 'Compte', to: '/account', icon: UserRound, active: location.pathname === '/account' || location.pathname === '/login' }
+  ];
+
+  return (
+    <nav className="bottom-navigation" aria-label={t('Navigation rapide')}>
+      {items.map(({ label, to, icon: Icon, active }) => (
+        <Link
+          key={label}
+          to={to}
+          state={label === 'Recherche' ? { focusSearch: true } : undefined}
+          className={`bottom-navigation__item${active ? ' is-active' : ''}${label === 'Publier' ? ' is-publish' : ''}`}
+          aria-current={active ? 'page' : undefined}
+          onClick={label === 'Messages' && user ? enableMessageNotifications : undefined}
+        >
+          <span className="bottom-navigation__icon">
+            <Icon size={20} strokeWidth={label === 'Publier' ? 2.5 : 2} aria-hidden="true" />
+            {label === 'Messages' && unread && unread.count > 0 && (
+              <span className="bottom-navigation__badge">
+                <span aria-hidden="true">{unread.count > 99 ? '99+' : unread.count}</span>
+                <span className="sr-only">{unread.count} {t('messages non lus')}</span>
+              </span>
+            )}
+          </span>
+          <span>{t(label)}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function AccountPage() {
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
+  const t = useT();
+  if (!user) return null;
+
+  return (
+    <div className="mx-auto max-w-xl rounded-[28px] border border-white/10 bg-[#121416] p-6 md:p-10">
+      <h1 className="text-4xl uppercase text-white">{t('Compte')}</h1>
+      <p className="mt-4 text-lg text-white">{user.firstName} {user.lastName}</p>
+      <p className="mt-1 text-sm text-stone">{user.email}</p>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link to="/my-listings" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white">{t('Mes annonces')}</Link>
+        <Link to="/favorites" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white">{t('Favoris')}</Link>
+        <button type="button" onClick={logout} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white">{t('Déconnexion')}</button>
+      </div>
     </div>
   );
 }
@@ -218,27 +291,6 @@ function RequireAuth({ children, adminOnly = false }: { children: ReactNode; adm
   return <>{children}</>;
 }
 
-function HalloweenDecor() {
-  return (
-    <div aria-hidden="true" className="pointer-events-none absolute left-0 top-0 h-full w-0">
-      <svg viewBox="0 0 90 90" className="absolute -left-4 -top-4 h-20 w-20 sm:-left-6 sm:h-24 sm:w-24" fill="none" stroke="#cbd5e1" strokeWidth="0.8" opacity="0.75">
-        <path d="M0 0 L90 0 M0 0 L0 90 M0 0 L80 55 M0 0 L55 80 M0 0 L88 25 M0 0 L25 88" />
-        <path d="M18 0 Q14 14 0 18 M36 0 Q30 30 0 36 M54 0 Q46 46 0 54 M72 0 Q62 62 0 72" />
-      </svg>
-      <svg viewBox="0 0 60 110" className="absolute left-2 top-0 h-16 w-9 origin-top animate-[spiderSwing_4s_ease-in-out_infinite] sm:left-3 sm:h-20 sm:w-11">
-        <line x1="30" y1="0" x2="30" y2="38" stroke="#cbd5e1" strokeWidth="1" />
-        <g stroke="#111" strokeWidth="2" strokeLinecap="round" fill="none">
-          <path d="M26 46 L14 40 L8 48 M26 50 L12 52 L8 60 M34 46 L46 40 L52 48 M34 50 L48 52 L52 60" />
-        </g>
-        <ellipse cx="30" cy="42" rx="5" ry="5" fill="#111" />
-        <ellipse cx="30" cy="56" rx="8" ry="10" fill="#1a1a1a" />
-        <circle cx="28" cy="41" r="1.2" fill="#ef4444" /><circle cx="32" cy="41" r="1.2" fill="#ef4444" />
-        <circle cx="30" cy="72" r="2.6" fill="#f5f5dc" /><circle cx="26" cy="82" r="2.2" fill="#f5f5dc" opacity="0.85" /><circle cx="34" cy="90" r="1.8" fill="#f5f5dc" opacity="0.65" />
-      </svg>
-    </div>
-  );
-}
-
 function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleTheme: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuthStore();
@@ -246,12 +298,6 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   const compareCount = useCompareStore((state) => state.ids.length);
   const { data: unread } = useUnreadCount(Boolean(user), user?.email);
   const unreadCount = unread?.count ?? 0;
-
-  const enableMessageNotifications = () => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      void Notification.requestPermission();
-    }
-  };
 
   const navItems = user
     ? [...appNavItems, { label: 'Messages', to: '/messages' }, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
@@ -266,8 +312,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <Link to="/catalog" className="relative flex items-center gap-2 pl-12 sm:gap-3 sm:pl-14">
-          <HalloweenDecor />
+        <Link to="/catalog" className="flex items-center gap-2 sm:gap-3">
           <img src={logoSpeedshift} alt="SpeedShift" className="h-9 w-9 rounded-full object-cover sm:h-10 sm:w-10" />
           <div>
             <div className="font-display text-2xl uppercase leading-none text-white sm:text-3xl">SpeedShift</div>
@@ -780,6 +825,9 @@ const ListingCard = memo(function ListingCard({ listing }: { listing: any; compa
 
 function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const focusedSearchLocation = useRef<string | null>(null);
   const category = searchParams.get('category') ?? undefined;
   const [query, setQuery] = useState(searchParams.get('query') ?? '');
   const [city, setCity] = useState(searchParams.get('city') ?? '');
@@ -805,6 +853,18 @@ function CatalogPage() {
     queryKey: ['listings', { category, query: appliedQuery, city: appliedCity, sort }],
     queryFn: () => getListings(category, appliedCity, appliedQuery, sort)
   });
+
+  useEffect(() => {
+    setQuery(appliedQuery);
+    setCity(appliedCity);
+  }, [appliedQuery, appliedCity]);
+
+  useEffect(() => {
+    if ((location.state as { focusSearch?: boolean } | null)?.focusSearch && data && focusedSearchLocation.current !== location.key) {
+      searchInputRef.current?.focus();
+      focusedSearchLocation.current = location.key;
+    }
+  }, [location.key, location.state, data]);
 
   const { filtered, recentCount } = useMemo(() => {
     if (!data) return { filtered: [] as any[], recentCount: 0 };
@@ -848,7 +908,7 @@ function CatalogPage() {
           </div>
           <div className="flex w-full max-w-xl items-center gap-2 rounded-full border border-white/10 bg-black/20 p-2">
             <Search size={16} className="ml-2 text-stone" />
-            <input value={query} onFocus={() => setFiltersOpen(true)} onClick={() => setFiltersOpen(true)} onChange={(e) => setQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); query.trim() ? next.set('query', query.trim()) : next.delete('query'); return next; }); }} placeholder="Nom, marque ou modèle…" className="w-full bg-transparent text-sm text-white placeholder:text-stone/60 focus:outline-none" />
+            <input ref={searchInputRef} value={query} onFocus={() => setFiltersOpen(true)} onClick={() => setFiltersOpen(true)} onChange={(e) => setQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); query.trim() ? next.set('query', query.trim()) : next.delete('query'); return next; }); }} placeholder="Nom, marque ou modèle…" className="w-full bg-transparent text-sm text-white placeholder:text-stone/60 focus:outline-none" />
             <button type="button" onClick={() => setSearchParams((previous) => { const next = new URLSearchParams(previous); query.trim() ? next.set('query', query.trim()) : next.delete('query'); return next; })} className="rounded-full bg-ember px-4 py-2 text-xs uppercase tracking-[0.2em] text-white">GO</button>
           </div>
         </div>

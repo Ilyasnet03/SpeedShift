@@ -297,7 +297,7 @@ export function CompareBar() {
   const { ids, clear } = useCompareStore();
   if (ids.length === 0) return null;
   return (
-    <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-[#121416] px-5 py-3 shadow-soft">
+    <div className="above-bottom-navigation fixed left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-[#121416] px-5 py-3 shadow-soft">
       <span className="text-sm text-white">{t('Comparateur')} ({ids.length}/{MAX_COMPARE})</span>
       <Link to="/compare" className={primaryBtn}>{t('Comparer')}</Link>
       <button type="button" onClick={clear} className="text-xs text-stone hover:text-white">{t('Vider')}</button>
@@ -447,7 +447,7 @@ export function MessageNotifier({ icon }: { icon?: string }) {
 
   if (showPrompt) {
     return (
-      <div className="fixed bottom-4 left-4 right-4 z-[60] max-w-sm rounded-2xl border border-ember/40 bg-[#121416] p-4 shadow-2xl sm:right-auto">
+      <div className="above-bottom-navigation fixed left-4 right-4 z-[60] max-w-sm rounded-2xl border border-ember/40 bg-[#121416] p-4 shadow-2xl sm:right-auto">
         <div className="flex items-center gap-2 text-sm font-semibold text-white"><MessageCircle size={16} className="text-ember" />Notifications de messages</div>
         <div className="mt-1 text-sm text-stone">
           {permission === 'denied'
@@ -469,7 +469,7 @@ export function MessageNotifier({ icon }: { icon?: string }) {
     <button
       type="button"
       onClick={() => { setToast(null); navigate('/messages'); }}
-      className="fixed bottom-4 right-4 z-[60] max-w-sm rounded-2xl border border-ember/40 bg-[#121416] p-4 text-left shadow-2xl"
+      className="above-bottom-navigation fixed right-4 z-[60] max-w-sm rounded-2xl border border-ember/40 bg-[#121416] p-4 text-left shadow-2xl"
     >
       <div className="flex items-center gap-2 text-sm font-semibold text-white"><MessageCircle size={16} className="text-ember" />{toast.title}</div>
       <div className="mt-1 line-clamp-2 text-sm text-stone">{toast.body}</div>

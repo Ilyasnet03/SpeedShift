@@ -108,11 +108,167 @@ html[data-theme='light'] select {
   @apply border border-white/10 bg-[#121416] shadow-soft;
 }
 
-@keyframes spiderSwing {
-  0%, 100% { transform: rotate(-6deg); }
-  50% { transform: rotate(6deg); }
+.app-shell {
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+}
+
+.bottom-navigation {
+  position: fixed;
+  z-index: 50;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  display: flex;
+  width: min(440px, calc(100% - 24px));
+  height: 68px;
+  transform: translateX(-50%);
+  border: 1px solid #25262a;
+  border-radius: 36px;
+  background: #101113;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+.bottom-navigation__item {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: #a4a4a8;
+  font-size: 10px;
+  line-height: 1;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.bottom-navigation__item + .bottom-navigation__item::before {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  inset-inline-start: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  content: '';
+}
+
+.bottom-navigation__item.is-active {
+  color: #fff;
+  font-weight: 600;
+}
+
+.bottom-navigation__item::after {
+  position: absolute;
+  bottom: 5px;
+  width: 60%;
+  height: 3px;
+  border-radius: 3px;
+  background: #ed0018;
+  content: '';
+  transform: scaleX(0);
+  transition: transform 200ms ease;
+}
+
+.bottom-navigation__item.is-active::after {
+  transform: scaleX(1);
+}
+
+.bottom-navigation__item:focus-visible {
+  outline: 2px solid #ed0018;
+  outline-offset: -3px;
+  border-radius: 20px;
+}
+
+.bottom-navigation__icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.bottom-navigation__item.is-active:not(.is-publish) .bottom-navigation__icon {
+  transform: translateY(-2px);
+}
+
+.bottom-navigation__item.is-publish .bottom-navigation__icon {
+  width: 44px;
+  height: 44px;
+  margin-top: -22px;
+  border: 3px solid #101113;
+  border-radius: 50%;
+  background: #ed0018;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(237, 0, 24, 0.35);
+}
+
+@media (hover: hover) {
+  .bottom-navigation .bottom-navigation__item:hover .bottom-navigation__icon {
+    transform: translateY(-3px) scale(1.08);
+  }
+
+  .bottom-navigation__item.is-publish:hover .bottom-navigation__icon {
+    box-shadow: 0 0 0 4px rgba(237, 0, 24, 0.2);
+  }
+}
+
+.bottom-navigation .bottom-navigation__item:active .bottom-navigation__icon {
+  transform: scale(0.9);
+}
+
+.bottom-navigation__badge {
+  position: absolute;
+  top: -7px;
+  inset-inline-start: 14px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ed0018;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+}
+
+.above-bottom-navigation {
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+}
+
+html[data-theme='light'] .bottom-navigation {
+  border-color: #e0e2e5;
+  background: #fff;
+  box-shadow: 0 6px 24px rgba(31, 41, 55, 0.16);
+}
+
+html[data-theme='light'] .bottom-navigation__item {
+  color: #69717b;
+}
+
+html[data-theme='light'] .bottom-navigation__item.is-active {
+  color: #20252b;
+}
+
+html[data-theme='light'] .bottom-navigation__item + .bottom-navigation__item::before {
+  background: rgba(31, 41, 55, 0.08);
+}
+
+html[data-theme='light'] .bottom-navigation__item.is-publish .bottom-navigation__icon {
+  border-color: #fff;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [class*='spiderSwing'] { animation: none !important; }
+  .bottom-navigation__item,
+  .bottom-navigation__item::after,
+  .bottom-navigation__icon {
+    transition: none;
+  }
+
+  .bottom-navigation .bottom-navigation__item.is-active:not(.is-publish) .bottom-navigation__icon,
+  .bottom-navigation .bottom-navigation__item:hover .bottom-navigation__icon,
+  .bottom-navigation .bottom-navigation__item:active .bottom-navigation__icon {
+    transform: none;
+  }
 }
