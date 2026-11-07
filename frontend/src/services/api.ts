@@ -392,8 +392,9 @@ export const renewListing = (id: number) => request<AdminListing>(`/listings/${i
 
 export type ConversationSummary = {
   id: number; listingId: number; listingTitle: string; otherUserName: string; lastMessage: string; lastMessageAt: string; unreadCount: number;
+  listingImageUrl?: string | null; listingPrice?: number | null; listingStatus?: string | null; listingDeleted?: boolean; buyer?: boolean;
 };
-export type MessageItem = { id: number; senderId: number; body: string; createdAt: string; mine: boolean };
+export type MessageItem = { id: number; senderId: number; body: string; createdAt: string; mine: boolean; readAt?: string | null };
 export type ConversationDetail = { conversation: ConversationSummary; messages: MessageItem[] };
 
 export const getConversations = () => request<ConversationSummary[]>('/conversations');

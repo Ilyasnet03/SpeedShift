@@ -108,7 +108,7 @@ public class MessagingService {
     private ConversationDetail detail(Conversation conversation, User viewer) {
         List<MessageItem> messages = messageRepository.findByConversationIdOrderByIdAsc(conversation.getId()).stream()
             .map(message -> new MessageItem(message.getId(), message.getSenderId(), message.getBody(), message.getCreatedAt(),
-                message.getSenderId().equals(viewer.getId())))
+                message.getSenderId().equals(viewer.getId()), message.getReadAt()))
             .toList();
         return new ConversationDetail(summaries(List.of(conversation), viewer).get(0), messages);
     }
@@ -135,7 +135,12 @@ public class MessagingService {
                 other == null ? "Utilisateur" : (other.getFirstName() + " " + initial(other.getLastName())).trim(),
                 last == null ? "" : last.getBody(),
                 item.getLastMessageAt(),
-                unread.getOrDefault(item.getId(), 0L));
+                unread.getOrDefault(item.getId(), 0L),
+                listing == null ? null : listing.getImageUrl(),
+                listing == null ? null : listing.getPrice(),
+                listing == null ? null : listing.getStatus(),
+                listing == null,
+                item.getBuyerId().equals(viewer.getId()));
         }).toList();
     }
 

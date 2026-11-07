@@ -70,6 +70,8 @@ Les services web gratuits Render peuvent se mettre en veille après une période
 - Espace « Mes annonces » avec suppression limitée aux annonces du compte connecté
 - Numéros de téléphone marocains (+212) et prix affichés en dirhams (DH)
 - Thème clair/sombre mémorisé et navigation adaptée au mobile
+- Catalogue trié par défaut des annonces les plus récentes aux plus anciennes
+- Messagerie avec recherche, filtres non lus/achats/ventes et statut de lecture ; les informations de l'annonce sont fournies par l'API
 - Ajout de jusqu’à 5 photos depuis l’appareil, avec redimensionnement avant envoi
 - API REST avec données de démonstration
 - Dockerisation complète

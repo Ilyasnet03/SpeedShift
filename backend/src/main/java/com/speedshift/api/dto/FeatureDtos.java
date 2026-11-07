@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 
 public final class FeatureDtos {
@@ -59,10 +60,15 @@ public final class FeatureDtos {
         String otherUserName,
         String lastMessage,
         LocalDateTime lastMessageAt,
-        long unreadCount
+        long unreadCount,
+        String listingImageUrl,
+        BigDecimal listingPrice,
+        String listingStatus,
+        boolean listingDeleted,
+        boolean buyer
     ) {}
 
-    public record MessageItem(Long id, Long senderId, String body, LocalDateTime createdAt, boolean mine) {}
+    public record MessageItem(Long id, Long senderId, String body, LocalDateTime createdAt, boolean mine, LocalDateTime readAt) {}
 
     public record ConversationDetail(ConversationSummary conversation, List<MessageItem> messages) {}
 

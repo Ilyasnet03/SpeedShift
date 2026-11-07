@@ -77,6 +77,8 @@ import { useFavoritesStore } from './store/favoritesStore';
 import { useCompareStore } from './store/compareStore';
 import { useT } from './lib/i18n';
 import { CityCombobox } from './CityCombobox';
+import { LoadingIndicator, MutationIndicator } from './LoadingIndicator';
+import { LoadingImage } from './LoadingImage';
 import {
   AdminAnalyticsTab,
   AdminAuditTab,
@@ -168,18 +170,21 @@ function App() {
     trackVisit(location.pathname);
   }, [location.pathname]);
   useEffect(() => startHeartbeat(), []);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
-    localStorage.getItem('speedshift-theme') === 'dark' ? 'dark' : 'light'
-  );
+  const [theme, setTheme] = useState<'dark' | 'light' | null>(() => {
+    const storedTheme = localStorage.getItem('speedshift-theme');
+    return storedTheme === 'dark' || storedTheme === 'light' ? storedTheme : null;
+  });
+  const effectiveTheme = theme ?? (location.pathname === '/messages' || location.pathname.startsWith('/messages/') ? 'dark' : 'light');
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem('speedshift-theme', theme);
-  }, [theme]);
+    document.documentElement.dataset.theme = effectiveTheme;
+    if (theme) localStorage.setItem('speedshift-theme', theme);
+  }, [effectiveTheme, theme]);
 
   return (
     <div className="app-shell min-h-screen bg-carbon text-stone">
-      <Header theme={theme} onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />
+      <Header theme={effectiveTheme} onToggleTheme={() => setTheme(effectiveTheme === 'dark' ? 'light' : 'dark')} />
+      <MutationIndicator />
       <MessageNotifier icon={logoSpeedshift} />
       <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <Routes>
@@ -790,7 +795,7 @@ const ListingCard = memo(function ListingCard({ listing }: { listing: any; compa
     >
       <Link to={`/listing/${listing.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121416] transition duration-300 hover:-translate-y-1 hover:border-ember/40 hover:shadow-soft">
         <div className="relative overflow-hidden">
-          {image ? <img src={thumbUrl(image)} alt={listing.title} loading="lazy" className={`aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-105 ${status === 'sold' ? 'opacity-60 grayscale' : ''}`} /> : <div className="aspect-[4/3] bg-black/20" />}
+          {image ? <LoadingImage src={thumbUrl(image)} alt={listing.title} loading="lazy" className={`aspect-[4/3] w-full ${status === 'sold' ? 'opacity-60' : ''}`} imageClassName={`transition duration-500 group-hover:scale-105 ${status === 'sold' ? 'grayscale' : ''}`} /> : <div className="aspect-[4/3] bg-black/20" />}
           {(!isPart || status === 'sold' || status === 'reserved') && (
             <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${status === 'sold' ? 'bg-neutral-800' : status === 'reserved' ? 'bg-amber-500' : 'bg-emerald-600'}`}>{status === 'sold' ? 'Vendu' : status === 'reserved' ? 'Réservé' : 'Disponible'}</span>
           )}
@@ -833,7 +838,7 @@ function CatalogPage() {
   const [city, setCity] = useState(searchParams.get('city') ?? '');
   const appliedQuery = searchParams.get('query') ?? '';
   const appliedCity = searchParams.get('city') ?? '';
-  const [sort, setSort] = useState('featured');
+  const [sort, setSort] = useState('newest');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const emptyFilters = { priceMin: '', priceMax: '', yearMin: '', yearMax: '', mileageMax: '', fuel: '', transmission: '', availability: '' };
   const [filters, setFilters] = useState(emptyFilters);
@@ -1040,13 +1045,13 @@ function ListingDetailPage() {
         <ArrowLeft size={16} /> Retour
       </button>
       <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[#121416]">
-        {selectedImage ? <img src={assetUrl(selectedImage)} alt={data.title} className="mx-auto aspect-square w-full max-w-[560px] object-cover" /> : <div className="flex aspect-square items-center justify-center text-stone">Aucune photo disponible</div>}
+        {selectedImage ? <LoadingImage src={assetUrl(selectedImage)} alt={data.title} className="mx-auto aspect-square w-full max-w-[560px]" /> : <div className="flex aspect-square items-center justify-center text-stone">Aucune photo disponible</div>}
       </section>
       {images.length > 1 && (
         <div className="flex gap-3 overflow-x-auto">
           {images.map((image, index) => (
             <button key={image.slice(0, 80) + index} type="button" onClick={() => setActiveImage(index)} aria-label={`Afficher la photo ${index + 1}`} aria-pressed={index === activeImage} className={`shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImage ? 'border-ember' : 'border-white/10'}`}>
-              <img src={thumbUrl(image)} alt="" className="h-20 w-20 object-cover" />
+              <LoadingImage src={thumbUrl(image)} alt="" className="h-20 w-20" />
             </button>
           ))}
         </div>
@@ -1288,6 +1293,11 @@ function SellPage() {
     });
   };
 
+  if (editingId !== null && myListingsQuery.isLoading) return <LoadingPanel />;
+  if (editingId !== null && myListingsQuery.isError) return <ErrorPanel error={myListingsQuery.error} onRetry={() => myListingsQuery.refetch()} />;
+  if (editingId !== null && !editingListing) return <ErrorPanel />;
+  if (editingId !== null && !prefilled) return <LoadingPanel />;
+
   return (
     <div className="max-w-4xl rounded-[28px] border border-white/10 bg-[#121416] p-6 md:p-10">
       <div className="mb-8">
@@ -1366,6 +1376,7 @@ function SellPage() {
         <button type="submit" disabled={mutation.isPending || uploading} className="rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60 md:col-span-2">
           {mutation.isPending || uploading ? 'Envoi en cours…' : editingId !== null ? 'Enregistrer les modifications' : 'Publier'}
         </button>
+        {uploading && !mutation.isPending && <div className="md:col-span-2"><LoadingIndicator /></div>}
       </form>
     </div>
   );
@@ -1421,6 +1432,8 @@ function MyListingsPage() {
         <p className="mt-2 text-stone/75">Consultez le statut de vos annonces ou supprimez celles dont vous n’avez plus besoin.</p>
       </div>
       {deleteMutation.isError && <p role="alert" className="text-sm text-red-400">Suppression impossible : {deleteMutation.error.message}</p>}
+      {statsQuery.isLoading && <LoadingIndicator />}
+      {statsQuery.isError && <p role="alert" className="text-sm text-red-400">Impossible de charger les statistiques. <button type="button" onClick={() => void statsQuery.refetch()} className="underline">{t('Réessayer')}</button></p>}
       {listingsQuery.isLoading ? <LoadingPanel /> : listingsQuery.isError ? <ErrorPanel error={listingsQuery.error} onRetry={() => listingsQuery.refetch()} /> : !listingsQuery.data ? <ErrorPanel /> : (
         listingsQuery.data.length === 0 ? (
           <div className="rounded-[24px] border border-white/10 bg-[#121416] p-10 text-center text-stone">
@@ -1431,7 +1444,7 @@ function MyListingsPage() {
           <div className="flex flex-col gap-3">
             {listingsQuery.data.map((listing) => (
               <article key={listing.id} className="flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#121416] sm:flex-row sm:items-center">
-                {getListingFirstImage(listing.imageUrl) && <img src={thumbUrl(getListingFirstImage(listing.imageUrl)!)} alt="" className="h-48 w-full object-cover sm:h-40 sm:w-48 sm:shrink-0" />}
+                {getListingFirstImage(listing.imageUrl) && <LoadingImage src={thumbUrl(getListingFirstImage(listing.imageUrl)!)} alt="" loading="lazy" className="h-48 w-full sm:h-40 sm:w-48 sm:shrink-0" />}
                 <div className="flex-1 space-y-2 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="font-display text-xl uppercase text-white">{listing.title}</h2>
@@ -1539,6 +1552,19 @@ function LoginPage() {
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
+
+  const beginRequest = () => {
+    if (pendingRef.current) return false;
+    pendingRef.current = true;
+    setPending(true);
+    return true;
+  };
+  const endRequest = () => {
+    pendingRef.current = false;
+    setPending(false);
+  };
 
   const finishLogin = (response: any) => {
     setUser({
@@ -1555,6 +1581,7 @@ function LoginPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!beginRequest()) return;
     setError(null);
     setInfo(null);
 
@@ -1585,12 +1612,14 @@ function LoginPage() {
         return;
       }
       setError(mode === 'login' ? 'Identifiants invalides ou service indisponible.' : 'Inscription impossible. Vérifiez vos informations et réessayez.');
+    } finally {
+      endRequest();
     }
   };
 
   const handleVerify = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!pendingEmail) return;
+    if (!pendingEmail || !beginRequest()) return;
     setError(null);
     try {
       finishLogin(await verifyEmail(pendingEmail, code.trim()));
@@ -1602,11 +1631,13 @@ function LoginPage() {
         : status === 400 ? 'Code incorrect.'
         : 'Vérification impossible. Réessayez.'
       );
+    } finally {
+      endRequest();
     }
   };
 
   const handleResend = async () => {
-    if (!pendingEmail) return;
+    if (!pendingEmail || !beginRequest()) return;
     setError(null);
     setInfo(null);
     try {
@@ -1614,11 +1645,14 @@ function LoginPage() {
       setInfo(`Un nouveau code a été envoyé à ${pendingEmail}.`);
     } catch (e) {
       setError(e instanceof ApiError && e.status === 429 ? 'Patientez une minute avant de redemander un code.' : 'Envoi impossible. Réessayez.');
+    } finally {
+      endRequest();
     }
   };
 
   const handlePasswordResetRequest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!beginRequest()) return;
     setError(null);
     setInfo(null);
     try {
@@ -1627,10 +1661,13 @@ function LoginPage() {
       setInfo('Si un compte vérifié existe pour cette adresse, un code de réinitialisation lui a été envoyé.');
     } catch {
       setError('Demande impossible. Vérifiez votre adresse e-mail et réessayez.');
+    } finally {
+      endRequest();
     }
   };
 
   const handlePasswordResetResend = async () => {
+    if (!beginRequest()) return;
     setError(null);
     setInfo(null);
     try {
@@ -1638,6 +1675,8 @@ function LoginPage() {
       setInfo('Si un compte vérifié existe pour cette adresse, un code de réinitialisation lui a été envoyé.');
     } catch {
       setError('Envoi impossible. Réessayez.');
+    } finally {
+      endRequest();
     }
   };
 
@@ -1649,6 +1688,7 @@ function LoginPage() {
       setError('Les deux mots de passe ne correspondent pas.');
       return;
     }
+    if (!beginRequest()) return;
     try {
       await resetPassword(form.email, resetCode.trim(), newPassword);
       setMode('login');
@@ -1664,6 +1704,8 @@ function LoginPage() {
         status === 400 ? 'Code invalide ou expiré. Vérifiez le code reçu, ou demandez-en un nouveau.'
         : 'Réinitialisation impossible. Réessayez.'
       );
+    } finally {
+      endRequest();
     }
   };
 
@@ -1672,12 +1714,13 @@ function LoginPage() {
       <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-6 sm:p-8">
         <h1 className="font-display text-3xl uppercase text-white">Mot de passe oublié</h1>
         <p className="mt-3 text-sm text-stone">Recevez un code de vérification par e-mail pour choisir un nouveau mot de passe.</p>
+        {pending && <div className="mt-4"><LoadingIndicator /></div>}
         {!resetRequested ? (
           <form onSubmit={handlePasswordResetRequest} className="mt-6 space-y-4">
             <input required type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Adresse email" />
             {info && <p role="status" className="text-sm text-emerald-400">{info}</p>}
             {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-            <button type="submit" className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">Envoyer un code</button>
+            <button type="submit" disabled={pending} className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60">Envoyer un code</button>
           </form>
         ) : (
           <>
@@ -1687,12 +1730,12 @@ function LoginPage() {
               <input required type="password" minLength={8} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Nouveau mot de passe" />
               <input required type="password" minLength={8} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Confirmer le mot de passe" />
               {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-              <button type="submit" disabled={resetCode.length !== 6} className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60">Modifier le mot de passe</button>
+              <button type="submit" disabled={pending || resetCode.length !== 6} className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60">Modifier le mot de passe</button>
             </form>
-            <button type="button" onClick={handlePasswordResetResend} className="mt-4 text-sm text-ember hover:underline">Renvoyer le code</button>
+            <button type="button" disabled={pending} onClick={handlePasswordResetResend} className="mt-4 text-sm text-ember hover:underline disabled:opacity-60">Renvoyer le code</button>
           </>
         )}
-        <button type="button" onClick={() => { setMode('login'); setResetRequested(false); setError(null); setInfo(null); }} className="mt-5 block text-sm text-stone hover:text-white">Retour à la connexion</button>
+        <button type="button" disabled={pending} onClick={() => { setMode('login'); setResetRequested(false); setError(null); setInfo(null); }} className="mt-5 block text-sm text-stone hover:text-white disabled:opacity-60">Retour à la connexion</button>
       </div>
     );
   }
@@ -1702,15 +1745,16 @@ function LoginPage() {
       <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-6 sm:p-8">
         <h1 className="font-display text-3xl uppercase text-white">Vérifiez votre e-mail</h1>
         <p className="mt-3 text-sm text-stone">Saisissez le code à 6 chiffres envoyé à <strong className="text-white">{pendingEmail}</strong>. Il est valable 15 minutes.</p>
+        {pending && <div className="mt-4"><LoadingIndicator /></div>}
         <form onSubmit={handleVerify} className="mt-6 space-y-4">
           <input required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-center text-2xl tracking-[0.5em] text-white placeholder:text-stone/60" placeholder="000000" />
           {info && <p className="text-sm text-emerald-400">{info}</p>}
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-          <button type="submit" disabled={code.length !== 6} className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60">Valider</button>
+          <button type="submit" disabled={pending || code.length !== 6} className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60">Valider</button>
         </form>
         <div className="mt-4 flex justify-between text-sm">
-          <button type="button" onClick={handleResend} className="text-ember hover:underline">Renvoyer le code</button>
-          <button type="button" onClick={() => { setPendingEmail(null); setError(null); setInfo(null); }} className="text-stone hover:text-white">Retour</button>
+          <button type="button" disabled={pending} onClick={handleResend} className="text-ember hover:underline disabled:opacity-60">Renvoyer le code</button>
+          <button type="button" disabled={pending} onClick={() => { setPendingEmail(null); setError(null); setInfo(null); }} className="text-stone hover:text-white disabled:opacity-60">Retour</button>
         </div>
       </div>
     );
@@ -1719,10 +1763,10 @@ function LoginPage() {
   return (
     <div className="mx-auto max-w-lg rounded-[28px] border border-white/10 bg-[#121416] p-6 sm:p-8">
       <div className="flex gap-2 rounded-full border border-white/10 bg-[#0d0f10] p-1">
-        <button type="button" onClick={() => setMode('login')} className={`flex-1 rounded-full px-4 py-2 text-sm ${mode === 'login' ? 'bg-ember text-white' : 'text-stone'}`}>
+        <button type="button" disabled={pending} onClick={() => setMode('login')} className={`flex-1 rounded-full px-4 py-2 text-sm ${mode === 'login' ? 'bg-ember text-white' : 'text-stone'}`}>
           Connexion
         </button>
-        <button type="button" onClick={() => setMode('register')} className={`flex-1 rounded-full px-4 py-2 text-sm ${mode === 'register' ? 'bg-ember text-white' : 'text-stone'}`}>
+        <button type="button" disabled={pending} onClick={() => setMode('register')} className={`flex-1 rounded-full px-4 py-2 text-sm ${mode === 'register' ? 'bg-ember text-white' : 'text-stone'}`}>
           Inscription
         </button>
       </div>
@@ -1763,12 +1807,13 @@ function LoginPage() {
 
         {error && <p className="text-sm text-red-400">{error}</p>}
         {info && <p role="status" className="text-sm text-emerald-400">{info}</p>}
+        {pending && <LoadingIndicator />}
 
-        <button type="submit" className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white">
+        <button type="submit" disabled={pending} className="w-full rounded-full bg-ember px-5 py-3 text-sm font-medium text-white disabled:opacity-60">
           {mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
         </button>
       </form>
-      {mode === 'login' && <button type="button" onClick={() => { setMode('forgot'); setResetRequested(false); setError(null); setInfo(null); }} className="mt-4 text-sm text-ember hover:underline">Mot de passe oublié ?</button>}
+      {mode === 'login' && <button type="button" disabled={pending} onClick={() => { setMode('forgot'); setResetRequested(false); setError(null); setInfo(null); }} className="mt-4 text-sm text-ember hover:underline disabled:opacity-60">Mot de passe oublié ?</button>}
     </div>
   );
 }
@@ -2166,7 +2211,7 @@ function AdminPage() {
       )}
 
       {section === 'stats' && (
-        statsQuery.isLoading ? <LoadingPanel /> : statsQuery.isError || !statsQuery.data ? <ErrorPanel error={statsQuery.error} onRetry={() => statsQuery.refetch()} /> : (
+        [statsQuery, overviewQuery, usersQuery, listingsQuery, viewsQuery, visitsQuery, ...(range.from <= range.to ? [activityQuery] : [])].some((query) => query.isLoading) ? <LoadingPanel /> : [statsQuery, overviewQuery, usersQuery, listingsQuery, viewsQuery, visitsQuery, ...(range.from <= range.to ? [activityQuery] : [])].some((query) => query.isError) || !statsQuery.data ? <ErrorPanel onRetry={() => void Promise.all([statsQuery, overviewQuery, usersQuery, listingsQuery, viewsQuery, visitsQuery, ...(range.from <= range.to ? [activityQuery] : [])].filter((query) => query.isError).map((query) => query.refetch()))} /> : (
           <DashboardOverview
             stats={statsQuery.data}
             overview={overviewQuery.data}
@@ -2303,7 +2348,7 @@ function AdminPage() {
                 const image = getListingFirstImage(listing.imageUrl);
                 return (
                   <article key={listing.id} className="flex flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[#121416] sm:flex-row sm:items-center">
-                    {image && <img src={image} alt="" className="h-48 w-full object-cover sm:h-44 sm:w-52 sm:shrink-0" />}
+                    {image && <LoadingImage src={image} alt="" loading="lazy" className="h-48 w-full sm:h-44 sm:w-52 sm:shrink-0" />}
                     <div className="flex-1 space-y-2 p-4">
                       <div className="flex items-center gap-3">
                         <span className="text-xs uppercase tracking-[0.2em] text-ember">{listing.category}</span>
@@ -2344,7 +2389,7 @@ function AdminPage() {
 }
 
 function LoadingPanel() {
-  return <div className="rounded-[24px] border border-white/10 bg-[#121416] p-10 text-center text-stone">Chargement du marché…</div>;
+  return <LoadingIndicator panel />;
 }
 
 function ErrorPanel({ error, onRetry }: { error?: unknown; onRetry?: () => void }) {

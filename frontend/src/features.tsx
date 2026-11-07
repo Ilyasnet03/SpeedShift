@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Check, Flag, Link2, MessageCircle, Share2, Star, Trash2 } from 'lucide-react';
+import { ArrowLeft, Check, CheckCheck, Flag, ImageOff, Link2, MessageCircle, Search, Send, Share2, Star, Trash2 } from 'lucide-react';
 import {
   assetUrl,
   deleteSellerReview,
@@ -22,11 +22,14 @@ import {
   startConversation,
   thumbUrl,
   type DayCount,
-  type LabelCount
+  type LabelCount,
+  type ConversationSummary
 } from './services/api';
 import { useAuthStore } from './store/authStore';
 import { MAX_COMPARE, useCompareStore } from './store/compareStore';
 import { LANGS, useLangStore, useT } from './lib/i18n';
+import { LoadingError, LoadingIndicator } from './LoadingIndicator';
+import { LoadingImage } from './LoadingImage';
 
 const card = 'rounded-3xl border border-white/10 bg-[#121416] p-5';
 const input = 'w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-ember';
@@ -195,7 +198,7 @@ export function SellerReviews({ sellerId }: { sellerId: number }) {
   const queryClient = useQueryClient();
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
-  const { data } = useQuery({ queryKey: ['seller-reviews', sellerId, user?.email], queryFn: () => getSellerReviews(sellerId) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['seller-reviews', sellerId, user?.email], queryFn: () => getSellerReviews(sellerId) });
   const refresh = (response: unknown) => queryClient.setQueryData(['seller-reviews', sellerId, user?.email], response);
   const save = useMutation({ mutationFn: () => saveSellerReview(sellerId, rating, comment), onSuccess: (response) => { refresh(response); setComment(''); } });
   const remove = useMutation({ mutationFn: () => deleteSellerReview(sellerId), onSuccess: refresh });
@@ -209,6 +212,9 @@ export function SellerReviews({ sellerId }: { sellerId: number }) {
         )}
       </div>
       <div className="mt-4 space-y-3">
+        {isLoading && <LoadingIndicator />}
+        {isError && !data && <LoadingError onRetry={() => void refetch()} />}
+        {remove.isError && <p role="alert" className="text-sm text-red-300">Erreur</p>}
         {data && data.reviews.length === 0 && <p className="text-sm text-stone">{t('Aucun avis pour le moment.')}</p>}
         {data?.reviews.map((review) => (
           <div key={review.id} className="rounded-2xl border border-white/10 bg-black/20 p-3">
@@ -310,7 +316,8 @@ export function ComparePage() {
   const { ids, remove } = useCompareStore();
   const query = useQuery({
     queryKey: ['compare', ids],
-    queryFn: () => Promise.all(ids.map((id) => getListing(id).catch(() => null)))
+    queryFn: () => Promise.all(ids.map((id) => getListing(id))),
+    enabled: ids.length > 0
   });
   const items = (query.data ?? []).filter(Boolean) as any[];
 
@@ -329,7 +336,7 @@ export function ComparePage() {
       <h1 className="text-5xl uppercase text-white">{t('Comparer les annonces')}</h1>
       {ids.length === 0 ? (
         <p className="text-stone">{t('Ajoutez jusqu\'à 3 annonces pour les comparer.')} <Link to="/catalog" className="text-ember">Market</Link></p>
-      ) : (
+      ) : query.isLoading ? <LoadingIndicator panel /> : query.isError ? <LoadingError onRetry={() => void query.refetch()} /> : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] border-separate border-spacing-3 text-sm">
             <thead>
@@ -338,7 +345,7 @@ export function ComparePage() {
                 {items.map((item) => (
                   <th key={item.id} className="align-top text-left font-normal">
                     <div className={card}>
-                      {firstImage(item.imageUrl) && <img src={thumbUrl(assetUrl(firstImage(item.imageUrl)!))} alt="" className="mb-3 h-32 w-full rounded-2xl object-cover" />}
+                      {firstImage(item.imageUrl) && <LoadingImage src={thumbUrl(assetUrl(firstImage(item.imageUrl)!))} alt="" loading="lazy" className="mb-3 h-32 w-full rounded-2xl" />}
                       <Link to={`/listing/${item.id}`} className="font-display text-xl uppercase text-white">{item.title}</Link>
                       <button type="button" onClick={() => remove(item.id)} className="mt-2 block text-xs text-red-300">{t('Retirer')}</button>
                     </div>
@@ -477,72 +484,153 @@ export function MessageNotifier({ icon }: { icon?: string }) {
   );
 }
 
+function ConversationAvatar({ name }: { name: string }) {
+  const initials = name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  return <span className="chat-avatar" aria-hidden="true">{initials || '?'}</span>;
+}
+
+function ListingThumbnail({ conversation }: { conversation: ConversationSummary }) {
+  const image = firstImage(conversation.listingImageUrl);
+  return image
+    ? <LoadingImage src={thumbUrl(image)} alt="" className="chat-listing-image" loading="lazy" />
+    : <span className="chat-listing-image chat-listing-placeholder" aria-hidden="true"><ImageOff size={20} /></span>;
+}
+
+function messageDate(value: string, locale: string, t: (text: string) => string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (day.getTime() === start.getTime()) return t("Aujourd'hui");
+  start.setDate(start.getDate() - 1);
+  if (day.getTime() === start.getTime()) return t('Hier');
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(date);
+}
+
+function messageTime(value: string, locale: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function ChatSkeleton() {
+  const t = useT();
+  return <div role="status" className="chat-skeleton"><span className="sr-only">{t('Chargement en cours…')}</span>{[1, 2, 3].map((item) => <div key={item} className="chat-skeleton-row"><span /><div><i /><i /></div></div>)}</div>;
+}
+
 export function MessagesPage() {
   const t = useT();
-  const { data } = useQuery({ queryKey: ['conversations'], queryFn: getConversations, refetchInterval: 10000 });
+  const lang = useLangStore((state) => state.lang);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'buying' | 'selling'>('all');
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['conversations'], queryFn: getConversations, refetchInterval: 10000 });
+  const filters = [['all', 'Tous'], ['unread', 'Non lus'], ['buying', 'Achats'], ['selling', 'Ventes']] as const;
+  const rolesAvailable = !data || data.every((item) => typeof item.buyer === 'boolean');
+  const filtered = data?.filter((item) => {
+    const text = `${item.otherUserName} ${item.listingTitle} ${item.lastMessage}`.toLocaleLowerCase(lang);
+    return text.includes(search.trim().toLocaleLowerCase(lang)) &&
+      (filter === 'all' || (filter === 'unread' && item.unreadCount > 0) || (filter === 'buying' && item.buyer === true) || (filter === 'selling' && item.buyer === false));
+  });
   return (
-    <div className="space-y-6">
-      <h1 className="text-5xl uppercase text-white">{t('Messages')}</h1>
-      {data && data.length === 0 && <p className="text-stone">{t('Aucune conversation.')}</p>}
-      <div className="space-y-3">
-        {data?.map((conversation) => (
-          <Link key={conversation.id} to={`/messages/${conversation.id}`} className={`${card} block hover:border-ember`}>
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-medium text-white">{conversation.otherUserName}</span>
-              {conversation.unreadCount > 0 && <span className="rounded-full bg-ember px-2 py-0.5 text-xs text-white">{conversation.unreadCount}</span>}
+    <section className="chat-shell chat-list">
+      <header className="chat-list-header">
+        <div className="chat-eyebrow">SPEEDSHIFT</div>
+        <h1>{t('Messages')}</h1>
+        <p>{t('Vos conversations au même endroit.')}</p>
+        <label className="chat-search">
+          <Search size={19} aria-hidden="true" />
+          <span className="sr-only">{t('Rechercher une conversation')}</span>
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('Rechercher une conversation')} />
+        </label>
+        <div className="chat-filters" role="group" aria-label={t('Filtrer les conversations')}>
+          {filters.map(([value, label]) => <button key={value} type="button" disabled={!rolesAvailable && (value === 'buying' || value === 'selling')} aria-pressed={filter === value} onClick={() => setFilter(value)}>{t(label)}</button>)}
+        </div>
+        {!rolesAvailable && <p role="status">{t('Les filtres achats et ventes nécessitent une mise à jour du serveur.')}</p>}
+      </header>
+      {isLoading && <ChatSkeleton />}
+      {isError && !data && <LoadingError onRetry={() => void refetch()} />}
+      {filtered?.length === 0 && <div className="chat-empty"><span><MessageCircle size={30} aria-hidden="true" /></span><strong>{t(data?.length ? 'Aucune conversation trouvée.' : 'Aucun message pour le moment')}</strong><p>{t(data?.length ? 'Essayez une autre recherche ou un autre filtre.' : 'Vos échanges avec les vendeurs et acheteurs apparaîtront ici.')}</p></div>}
+      <div className="chat-list-items">
+        {filtered?.map((conversation) => (
+          <Link key={conversation.id} to={`/messages/${conversation.id}`} className="chat-conversation">
+            <ConversationAvatar name={conversation.otherUserName} />
+            <div className="chat-conversation-content">
+              <div className="chat-conversation-heading"><strong>{conversation.otherUserName}</strong><time>{messageDate(conversation.lastMessageAt, lang, t) === t("Aujourd'hui") ? messageTime(conversation.lastMessageAt, lang) : messageDate(conversation.lastMessageAt, lang, t)}</time></div>
+              <div className="chat-conversation-listing">{conversation.listingTitle}</div>
+              <div className="chat-conversation-heading"><span className="chat-preview">{conversation.lastMessage}</span>{conversation.unreadCount > 0 && <span className="chat-badge" aria-label={`${conversation.unreadCount} ${t('messages non lus')}`}>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</span>}</div>
             </div>
-            <div className="text-xs text-stone">{conversation.listingTitle}</div>
-            <p className="mt-1 truncate text-sm text-stone">{conversation.lastMessage}</p>
+            <ListingThumbnail conversation={conversation} />
           </Link>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
 export function MessageThreadPage() {
   const t = useT();
+  const lang = useLangStore((state) => state.lang);
   const id = Number(useParams().id);
   const queryClient = useQueryClient();
   const [body, setBody] = useState('');
   const bottom = useRef<HTMLDivElement>(null);
-  const { data } = useQuery({ queryKey: ['conversation', id], queryFn: () => getConversation(id), refetchInterval: 5000, enabled: Number.isFinite(id) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['conversation', id], queryFn: () => getConversation(id), refetchInterval: 5000, enabled: Number.isFinite(id) && id > 0 });
   const send = useMutation({
-    mutationFn: () => sendMessage(id, body),
-    onSuccess: (detail) => {
-      setBody('');
+    mutationFn: (text: string) => sendMessage(id, text),
+    onSuccess: (detail, text) => {
+      setBody((current) => current === text ? '' : current);
       queryClient.setQueryData(['conversation', id], detail);
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
     }
   });
-
+  const submit = () => {
+    const text = body.trim();
+    if (text && !send.isPending) send.mutate(text);
+  };
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: 'end' });
-    queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+    bottom.current?.scrollIntoView({ block: 'nearest' });
+    void queryClient.invalidateQueries({ queryKey: ['unread-count'] });
   }, [data?.messages.length, queryClient]);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <Link to="/messages" className="text-sm text-stone hover:text-white">← {t('Retour')}</Link>
-      {data && (
-        <div>
-          <h1 className="text-4xl uppercase text-white">{data.conversation.otherUserName}</h1>
-          <Link to={`/listing/${data.conversation.listingId}`} className="text-sm text-ember">{data.conversation.listingTitle}</Link>
+    <section className="chat-shell chat-thread">
+      <header className="chat-thread-header">
+        <Link to="/messages" className="chat-icon-button" aria-label={t('Retour')}><ArrowLeft size={20} /></Link>
+        {data && <><ConversationAvatar name={data.conversation.otherUserName} /><div><h1>{data.conversation.otherUserName}</h1><p>{t('Conversation')}</p></div></>}
+      </header>
+      {(!Number.isFinite(id) || id <= 0) && <p role="alert" className="chat-notice">{t('Impossible de charger ces données.')}</p>}
+      {id > 0 && isLoading && <ChatSkeleton />}
+      {isError && !data && <LoadingError onRetry={() => void refetch()} />}
+      {data && <>
+        <div className="chat-listing-card">
+          <ListingThumbnail conversation={data.conversation} />
+          <div className="chat-listing-info"><strong>{data.conversation.listingTitle}</strong>{data.conversation.listingPrice != null && <span>{formatMoney(data.conversation.listingPrice)}</span>}</div>
+          {!data.conversation.listingDeleted && <Link to={`/listing/${data.conversation.listingId}`} className="chat-listing-link">{t("Voir l'annonce")}</Link>}
         </div>
-      )}
-      <div className={`${card} flex max-h-[50vh] min-h-[240px] flex-col gap-2 overflow-y-auto`}>
-        {data?.messages.map((message) => (
-          <div key={message.id} className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2 text-sm ${message.mine ? 'self-end bg-ember text-white' : 'self-start bg-white/10 text-white'}`}>
-            {message.body}
-          </div>
-        ))}
-        <div ref={bottom} />
-      </div>
-      <form onSubmit={(event) => { event.preventDefault(); if (body.trim() && !send.isPending) send.mutate(); }} className="flex gap-2">
-        <input value={body} onChange={(event) => setBody(event.target.value)} maxLength={2000} placeholder={t('Écrivez un message…')} className={input} />
-        <button type="submit" disabled={send.isPending || !body.trim()} className={primaryBtn}>{t('Envoyer')}</button>
-      </form>
-    </div>
+        {(data.conversation.listingDeleted || data.conversation.listingStatus?.toLowerCase() === 'sold') && <p className="chat-notice">{t(data.conversation.listingDeleted ? 'Cette annonce a été supprimée.' : 'Cette annonce est vendue.')}</p>}
+        <div className="chat-messages">
+          {data.messages.map((message, index) => {
+            const date = messageDate(message.createdAt, lang, t);
+            const previousDate = index > 0 ? messageDate(data.messages[index - 1].createdAt, lang, t) : null;
+            return <div key={message.id} className="chat-message-group">
+              {date !== previousDate && <div className="chat-date">{date}</div>}
+              <div className={`chat-bubble ${message.mine ? 'chat-bubble--mine' : ''}`}>
+                <p>{message.body}</p>
+                <div className="chat-bubble-meta"><time>{messageTime(message.createdAt, lang)}</time>{message.mine && (message.readAt ? <CheckCheck size={15} aria-label={t('Lu')} /> : <Check size={15} aria-label={t('Envoyé')} />)}</div>
+              </div>
+            </div>;
+          })}
+          {send.isPending && <div className="chat-sending" role="status">{t('Envoi en cours…')}</div>}
+          <div ref={bottom} />
+        </div>
+        {send.isError && <div className="chat-send-error" role="alert"><span>{t("Échec de l'envoi.")}</span><button type="button" onClick={submit} disabled={send.isPending || !body.trim()}>{t('Réessayer')}</button></div>}
+        <div className="chat-quick-replies">{['Est-ce toujours disponible ?', 'Dernier prix ?'].map((reply) => <button key={reply} type="button" onClick={() => setBody(t(reply))}>{t(reply)}</button>)}</div>
+        <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="chat-compose">
+          <input value={body} onChange={(event) => setBody(event.target.value)} maxLength={2000} placeholder={t('Écrivez un message…')} aria-label={t('Écrivez un message…')} />
+          <button type="submit" disabled={send.isPending || !body.trim()} aria-label={t('Envoyer')}><Send size={20} /></button>
+        </form>
+      </>}
+    </section>
   );
 }
 
@@ -582,8 +670,9 @@ function Distribution({ title, data }: { title: string; data: LabelCount[] }) {
 
 export function AdminAnalyticsTab() {
   const t = useT();
-  const { data } = useQuery({ queryKey: ['admin-analytics'], queryFn: () => getAdminAnalytics(30) });
-  if (!data) return null;
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-analytics'], queryFn: () => getAdminAnalytics(30) });
+  if (isLoading) return <LoadingIndicator panel />;
+  if (isError || !data) return <LoadingError onRetry={() => void refetch()} />;
   const totals: [string, number][] = [
     ['Vues', data.totalViews],
     ['Contacts', data.totalContacts],
@@ -617,7 +706,7 @@ export function AdminAnalyticsTab() {
 export function AdminReportsTab() {
   const t = useT();
   const queryClient = useQueryClient();
-  const { data } = useQuery({ queryKey: ['admin-reports'], queryFn: getAdminReports });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-reports'], queryFn: getAdminReports });
   const resolve = useMutation({
     mutationFn: (args: { id: number; status: 'RESOLVED' | 'DISMISSED'; archive: boolean }) => resolveAdminReport(args.id, args.status, args.archive),
     onSuccess: () => {
@@ -625,10 +714,12 @@ export function AdminReportsTab() {
       queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
     }
   });
-  if (!data) return null;
+  if (isLoading) return <LoadingIndicator panel />;
+  if (isError || !data) return <LoadingError onRetry={() => void refetch()} />;
   if (data.length === 0) return <p className="text-stone">{t('Aucun signalement.')}</p>;
   return (
     <div className="space-y-3">
+      {resolve.isError && <p role="alert" className="text-sm text-red-300">Erreur</p>}
       {data.map((report) => (
         <div key={report.id} className={card}>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -652,8 +743,9 @@ export function AdminReportsTab() {
 
 export function AdminAuditTab() {
   const t = useT();
-  const { data } = useQuery({ queryKey: ['admin-audit'], queryFn: getAdminAudit });
-  if (!data) return null;
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['admin-audit'], queryFn: getAdminAudit });
+  if (isLoading) return <LoadingIndicator panel />;
+  if (isError || !data) return <LoadingError onRetry={() => void refetch()} />;
   if (data.length === 0) return <p className="text-stone">{t('Aucune entrée.')}</p>;
   return (
     <div className="overflow-x-auto rounded-3xl border border-white/10 bg-[#121416]">
