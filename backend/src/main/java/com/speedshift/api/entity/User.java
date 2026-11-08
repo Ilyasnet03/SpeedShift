@@ -10,6 +10,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
@@ -69,6 +70,11 @@ public class User implements UserDetails {
 
     @Column(nullable = false)
     private int passwordResetAttempts = 0;
+
+    private Instant premiumUntil;
+
+    @Column(nullable = false)
+    private boolean speedshiftCertified;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

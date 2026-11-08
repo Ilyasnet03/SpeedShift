@@ -6,6 +6,8 @@ import com.speedshift.api.dto.AdminDtos.ListingStatusUpdate;
 import com.speedshift.api.dto.AdminDtos.ListingSummary;
 import com.speedshift.api.dto.AdminDtos.ListingViewSummary;
 import com.speedshift.api.dto.AdminDtos.RoleUpdate;
+import com.speedshift.api.dto.AdminDtos.PremiumUpdate;
+import com.speedshift.api.dto.AdminDtos.CertificationUpdate;
 import com.speedshift.api.dto.AdminDtos.SiteVisitSummary;
 import com.speedshift.api.dto.AdminDtos.ActivityStats;
 import com.speedshift.api.dto.AdminDtos.AdminOverview;
@@ -23,6 +25,8 @@ import com.speedshift.api.service.AuditService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -104,6 +108,23 @@ public class AdminController {
     ) {
         UserSummary result = adminService.setUserRole(id, Role.valueOf(request.role()), actor);
         auditService.log(actor, "USER_ROLE", "USER", id, result.email() + " → " + request.role());
+        return result;
+    }
+
+    @PatchMapping("/users/{id}/premium")
+    public UserSummary setUserPremium(@PathVariable Long id, @Valid @RequestBody PremiumUpdate request, @AuthenticationPrincipal User actor) {
+        if (request.active() != (request.premiumUntil() != null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Une date d'expiration est requise pour activer le premium.");
+        }
+        UserSummary result = adminService.setPremiumUntil(id, request.premiumUntil());
+        auditService.log(actor, "USER_PREMIUM", "USER", id, result.email() + " → " + request.premiumUntil());
+        return result;
+    }
+
+    @PatchMapping("/users/{id}/certification")
+    public UserSummary setUserCertification(@PathVariable Long id, @Valid @RequestBody CertificationUpdate request, @AuthenticationPrincipal User actor) {
+        UserSummary result = adminService.setCertification(id, request.certified());
+        auditService.log(actor, "USER_CERTIFICATION", "USER", id, result.email() + " → " + request.certified());
         return result;
     }
 

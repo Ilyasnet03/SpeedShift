@@ -9,6 +9,7 @@ import com.speedshift.api.dto.ListingDtos.MarketSummary;
 import com.speedshift.api.entity.Listing;
 import com.speedshift.api.entity.User;
 import com.speedshift.api.repository.ListingRepository;
+import com.speedshift.api.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,11 +18,14 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class ListingService {
@@ -29,9 +33,11 @@ public class ListingService {
     public static final long LISTING_LIFETIME_DAYS = 30;
 
     private final ListingRepository listingRepository;
+    private final UserRepository userRepository;
 
-    public ListingService(ListingRepository listingRepository) {
+    public ListingService(ListingRepository listingRepository, UserRepository userRepository) {
         this.listingRepository = listingRepository;
+        this.userRepository = userRepository;
     }
 
     public List<ListingResponse> getListings(String category, String city, String query, String sort) {
@@ -54,15 +60,18 @@ public class ListingService {
             default -> Comparator.comparing(Listing::getFeatured, Comparator.nullsLast(Boolean::compareTo)).reversed();
         };
 
+        Map<Long, User> sellers = sellersFor(listings);
+        Instant now = Instant.now();
         return listings.stream()
-            .sorted(comparator)
-            .map(this::toResponse)
+            .sorted(premiumFirst(sellers, now).thenComparing(comparator))
+            .map(listing -> toResponse(listing, sellers.get(listing.getSellerId()), now))
             .toList();
     }
 
     public List<ListingResponse> getMyListings(User seller) {
+        Instant now = Instant.now();
         return listingRepository.findBySellerIdOrderByCreatedAtDesc(seller.getId()).stream()
-            .map(this::toResponse)
+            .map(listing -> toResponse(listing, seller, now))
             .toList();
     }
 
@@ -192,11 +201,13 @@ public class ListingService {
     }
 
     public List<ListingResponse> getPendingListings() {
-        return listingRepository.findAll().stream()
+        List<Listing> pending = listingRepository.findAll().stream()
             .filter(item -> "pending".equalsIgnoreCase(item.getStatus()))
             .sorted(Comparator.comparing(Listing::getCreatedAt).reversed())
-            .map(this::toResponse)
             .toList();
+        Map<Long, User> sellers = sellersFor(pending);
+        Instant now = Instant.now();
+        return pending.stream().map(listing -> toResponse(listing, sellers.get(listing.getSellerId()), now)).toList();
     }
 
     public ListingResponse publishListing(Long id) {
@@ -215,6 +226,7 @@ public class ListingService {
             throw new IllegalArgumentException("Listing not found: " + id);
         }
 
+        User seller = sellerFor(listing);
         return new ListingDetailResponse(
             listing.getId(),
             listing.getTitle(),
@@ -243,25 +255,31 @@ public class ListingService {
             listing.getAvailability(),
             listing.getSellerId(),
             listing.getShowPhone(),
-            listing.getCreatedAt()
+            listing.getCreatedAt(),
+            isPremium(seller, Instant.now()),
+            seller != null && seller.isSpeedshiftCertified()
         );
     }
 
     public HomeResponse getHomePage() {
         List<Listing> all = listingRepository.findAll();
+        Map<Long, User> sellers = sellersFor(all);
+        Instant now = Instant.now();
+        Comparator<Listing> priority = premiumFirst(sellers, now)
+            .thenComparing(Comparator.comparing(Listing::getCreatedAt).reversed());
         List<ListingResponse> featured = all.stream()
             .filter(this::isVisible)
-            .filter(item -> Boolean.TRUE.equals(item.getFeatured()))
-            .sorted(Comparator.comparing(Listing::getCreatedAt).reversed())
+            .filter(item -> Boolean.TRUE.equals(item.getFeatured()) || isPremium(sellers.get(item.getSellerId()), now))
+            .sorted(priority)
             .limit(4)
-            .map(this::toResponse)
+            .map(listing -> toResponse(listing, sellers.get(listing.getSellerId()), now))
             .toList();
 
         List<ListingResponse> latest = all.stream()
             .filter(this::isVisible)
-            .sorted(Comparator.comparing(Listing::getCreatedAt).reversed())
+            .sorted(priority)
             .limit(6)
-            .map(this::toResponse)
+            .map(listing -> toResponse(listing, sellers.get(listing.getSellerId()), now))
             .toList();
 
         List<CategorySummary> categories = List.of(
@@ -286,6 +304,10 @@ public class ListingService {
     }
 
     private ListingResponse toResponse(Listing listing) {
+        return toResponse(listing, sellerFor(listing), Instant.now());
+    }
+
+    private ListingResponse toResponse(Listing listing, User seller, Instant now) {
         return new ListingResponse(
             listing.getId(),
             listing.getTitle(),
@@ -313,8 +335,27 @@ public class ListingService {
             listing.getDescription(),
             listing.getSellerId(),
             listing.getShowPhone(),
-            listing.getExpiresAt()
+            listing.getExpiresAt(),
+            isPremium(seller, now),
+            seller != null && seller.isSpeedshiftCertified()
         );
+    }
+
+    private User sellerFor(Listing listing) {
+        return listing.getSellerId() == null ? null : userRepository.findById(listing.getSellerId()).orElse(null);
+    }
+
+    private Map<Long, User> sellersFor(List<Listing> listings) {
+        List<Long> ids = listings.stream().map(Listing::getSellerId).filter(Objects::nonNull).distinct().toList();
+        return userRepository.findAllById(ids).stream().collect(Collectors.toMap(User::getId, Function.identity()));
+    }
+
+    private boolean isPremium(User seller, Instant now) {
+        return seller != null && seller.getPremiumUntil() != null && seller.getPremiumUntil().isAfter(now);
+    }
+
+    private Comparator<Listing> premiumFirst(Map<Long, User> sellers, Instant now) {
+        return Comparator.comparing((Listing listing) -> isPremium(sellers.get(listing.getSellerId()), now)).reversed();
     }
 
     private String phoneFor(Listing listing) {

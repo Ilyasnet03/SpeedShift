@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Pattern;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 public final class AdminDtos {
@@ -32,7 +33,9 @@ public final class AdminDtos {
         String phone,
         String role,
         boolean enabled,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        Instant premiumUntil,
+        boolean speedshiftCertified
     ) {}
 
     public record ListingSummary(
@@ -111,6 +114,10 @@ public final class AdminDtos {
     ) {}
 
     public record EnabledUpdate(@NotNull Boolean enabled) {}
+
+    public record PremiumUpdate(@NotNull Boolean active, Instant premiumUntil) {}
+
+    public record CertificationUpdate(@NotNull Boolean certified) {}
 
     public record RoleUpdate(
         @NotBlank @Pattern(regexp = "CLIENT|ADMIN") String role

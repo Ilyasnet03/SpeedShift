@@ -58,7 +58,9 @@ public class ListingDtos {
         String description,
         Long sellerId,
         Boolean showPhone,
-        java.time.LocalDateTime expiresAt
+        java.time.LocalDateTime expiresAt,
+        boolean sellerPremium,
+        boolean sellerCertified
     ) {}
 
     public record ListingStatusRequest(
@@ -104,7 +106,9 @@ public class ListingDtos {
         String availability,
         Long sellerId,
         Boolean showPhone,
-        java.time.LocalDateTime createdAt
+        java.time.LocalDateTime createdAt,
+        boolean sellerPremium,
+        boolean sellerCertified
     ) {}
 
 }

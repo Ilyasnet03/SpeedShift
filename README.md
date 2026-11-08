@@ -66,11 +66,11 @@ Les services web gratuits Render peuvent se mettre en veille après une période
 - Publication d'annonces avec validation avant affichage sur le marché
 - Fiche annonce détaillée
 - Formulaire de publication
-- Back-office admin avec statistiques, gestion des utilisateurs (rôles et suspension) et modération/suppression des annonces
+- Back-office admin avec statistiques, gestion des utilisateurs (rôles, suspension, premium et certification) et modération/suppression des annonces
 - Espace « Mes annonces » avec suppression limitée aux annonces du compte connecté
 - Numéros de téléphone marocains (+212) et prix affichés en dirhams (DH)
 - Thème clair/sombre mémorisé et navigation adaptée au mobile
-- Catalogue trié par défaut des annonces les plus récentes aux plus anciennes
+- Catalogue trié par défaut des annonces les plus récentes aux plus anciennes, après les annonces des comptes premium actifs
 - Messagerie avec recherche, filtres non lus/achats/ventes et statut de lecture ; les informations de l'annonce sont fournies par l'API
 - Ajout de jusqu’à 5 photos depuis l’appareil, avec redimensionnement avant envoi
 - API REST avec données de démonstration
@@ -81,3 +81,5 @@ Les services web gratuits Render peuvent se mettre en veille après une période
 Les migrations Flyway `V4` et `V5` localisent les annonces de démonstration au Maroc, convertissent leurs prix en DH selon un taux fixe d’exemple de 1 EUR = 10,8 DH, et relient les annonces à leur propriétaire. Elles ne convertissent pas les prix saisis par les utilisateurs. Les utilisateurs peuvent supprimer uniquement leurs annonces ; un administrateur peut supprimer n’importe quelle annonce. Si les sections admin retournent une erreur 403, reconnectez-vous avec le compte configuré dans `ADMIN_EMAIL` pour renouveler son rôle dans le jeton.
 
 La migration `V4` élargit également le stockage des photos : celles envoyées depuis le téléphone sont redimensionnées et enregistrées avec l’annonce dans PostgreSQL, où elles restent disponibles après redémarrage du service.
+
+Dans **Administration → Utilisateurs**, un administrateur peut activer ou retirer le premium d'un compte et choisir une date et une heure d'expiration (dans son fuseau horaire local). Jusqu'à cette échéance, les annonces du compte sont prioritaires dans tous les tris ; le tri choisi s'applique à l'intérieur de chaque groupe. La certification SpeedShift est gérée séparément et son badge apparaît sur les annonces et leur fiche, même après expiration du premium. La migration Flyway `V16` ajoute ces paramètres aux comptes existants sans les activer par défaut.

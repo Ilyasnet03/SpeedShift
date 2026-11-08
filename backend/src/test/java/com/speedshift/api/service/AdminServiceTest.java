@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -94,6 +95,31 @@ class AdminServiceTest {
         adminService.setListingStatus(7L, "PUBLISHED");
 
         assertEquals("published", listing.getStatus());
+    }
+
+    @Test
+    void premiumAndCertificationAreIndependentAndRevocable() {
+        User client = user(3L, Role.CLIENT, true);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(client));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Instant expiry = Instant.now().plusSeconds(3600);
+
+        adminService.setPremiumUntil(3L, expiry);
+        assertEquals(expiry, client.getPremiumUntil());
+        assertEquals(false, client.isSpeedshiftCertified());
+        adminService.setCertification(3L, true);
+        adminService.setPremiumUntil(3L, null);
+        assertEquals(null, client.getPremiumUntil());
+        assertEquals(true, client.isSpeedshiftCertified());
+        adminService.setCertification(3L, false);
+        assertEquals(false, client.isSpeedshiftCertified());
+    }
+
+    @Test
+    void rejectsPastPremiumExpiration() {
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+            () -> adminService.setPremiumUntil(3L, Instant.now().minusSeconds(1)));
+        verify(userRepository, never()).save(any(User.class));
     }
 
     private User user(Long id, Role role, boolean enabled) {

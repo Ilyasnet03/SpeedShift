@@ -239,6 +239,114 @@ html[data-theme='light'] .chat-shell {
 .chat-empty { display: grid; justify-items: center; gap: 12px; padding: 48px 24px 64px; text-align: center; }
 .chat-empty > span { display: grid; width: 64px; height: 64px; place-items: center; border-radius: 50%; background: var(--chat-raised); color: #e55037; }
 .chat-empty p { max-width: 340px; color: var(--chat-muted); font-size: 0.875rem; }
+
+.catalog-search-panel {
+  background: #17171b;
+}
+
+.catalog-search-panel h1 {
+  font-family: Inter, sans-serif;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+  text-transform: none;
+}
+
+.catalog-search-bar {
+  min-height: 48px;
+}
+
+.catalog-controls {
+  display: grid;
+  gap: 16px;
+}
+
+.catalog-select-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.catalog-select {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  appearance: none;
+  padding: 0 38px 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background-color: #17171b;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a4a4a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  color: #f5f5f5;
+  font-size: 0.9rem;
+}
+
+.catalog-select:focus-visible {
+  outline: 2px solid #e55037;
+  outline-offset: 2px;
+}
+
+.catalog-city-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.catalog-city-chips button {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+}
+
+.catalog-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+}
+
+.listing-card--compact > a {
+  border-radius: 16px;
+}
+
+.listing-card--compact .listing-card__content {
+  gap: 4px;
+  padding: 10px 12px 12px;
+}
+
+.certified-badge {
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  background: rgba(59, 130, 246, 0.1);
+  color: #93c5fd;
+}
+
+html[data-theme='light'] .certified-badge {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+html[data-theme='light'] .catalog-search-panel {
+  background: #fff;
+}
+
+html[data-theme='light'] .catalog-select {
+  border-color: rgba(31, 41, 55, 0.14);
+  background-color: #f6f7f9;
+  color: #20252b;
+  color-scheme: light;
+}
+
+html[data-theme='light'] .catalog-select option {
+  background: #fff;
+  color: #20252b;
+}
+
 .chat-thread-header { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid var(--chat-border); }
 .chat-thread-header h1 { font-family: Inter, sans-serif; font-size: 1rem; font-weight: 700; letter-spacing: 0; }
 .chat-thread-header p { margin-top: 2px; color: var(--chat-muted); font-size: 0.75rem; }

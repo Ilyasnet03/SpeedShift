@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -62,11 +63,29 @@ public class AdminService {
     public List<UserSummary> getUsers() {
         return userRepository.findAll().stream()
             .sorted(Comparator.comparing(User::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .map(user -> new UserSummary(
-                user.getId(), user.getFirstName(), user.getLastName(), user.getEmail(),
-                user.getPhone(), user.getRole().name(), user.isEnabled(), user.getCreatedAt()
-            ))
+            .map(this::toUserSummary)
             .toList();
+    }
+
+    @Transactional
+    public UserSummary setPremiumUntil(Long id, Instant premiumUntil) {
+        if (premiumUntil != null && !premiumUntil.isAfter(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La date d'expiration doit être dans le futur.");
+        }
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur introuvable."));
+        user.setPremiumUntil(premiumUntil);
+        user.setUpdatedAt(LocalDateTime.now());
+        return toUserSummary(userRepository.save(user));
+    }
+
+    @Transactional
+    public UserSummary setCertification(Long id, boolean certified) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur introuvable."));
+        user.setSpeedshiftCertified(certified);
+        user.setUpdatedAt(LocalDateTime.now());
+        return toUserSummary(userRepository.save(user));
     }
 
     @Transactional
@@ -148,7 +167,8 @@ public class AdminService {
     private UserSummary toUserSummary(User user) {
         return new UserSummary(
             user.getId(), user.getFirstName(), user.getLastName(), user.getEmail(),
-            user.getPhone(), user.getRole().name(), user.isEnabled(), user.getCreatedAt()
+            user.getPhone(), user.getRole().name(), user.isEnabled(), user.getCreatedAt(),
+            user.getPremiumUntil(), user.isSpeedshiftCertified()
         );
     }
 

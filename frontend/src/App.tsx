@@ -62,6 +62,8 @@ import {
   setAdminListingStatus,
   setAdminUserEnabled,
   setAdminUserRole,
+  setAdminUserPremium,
+  setAdminUserCertification,
   type AdminListingStatus,
   type AdminListing,
   type AdminUser,
@@ -77,6 +79,7 @@ import { useFavoritesStore } from './store/favoritesStore';
 import { useCompareStore } from './store/compareStore';
 import { useT } from './lib/i18n';
 import { CityCombobox } from './CityCombobox';
+import { MOROCCAN_CITIES } from './lib/moroccoCities';
 import { LoadingIndicator, MutationIndicator } from './LoadingIndicator';
 import { LoadingImage } from './LoadingImage';
 import {
@@ -769,7 +772,11 @@ function timeAgo(value?: string | null) {
   return months < 12 ? `il y a ${months} mois` : `il y a ${Math.floor(months / 12)} an${months >= 24 ? 's' : ''}`;
 }
 
-const ListingCard = memo(function ListingCard({ listing }: { listing: any; compact?: boolean }) {
+function CertifiedBadge() {
+  return <span className="certified-badge inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold"><ShieldCheck size={13} aria-hidden="true" /> Certifié SpeedShift</span>;
+}
+
+const ListingCard = memo(function ListingCard({ listing, compact = false }: { listing: any; compact?: boolean }) {
   const userKey = useAuthStore((state) => state.user?.email) ?? 'guest';
   const liked = useFavoritesStore((state) => (state.byUser[userKey] ?? []).includes(listing.id));
   const toggleFavorite = useFavoritesStore((state) => state.toggle);
@@ -791,12 +798,12 @@ const ListingCard = memo(function ListingCard({ listing }: { listing: any; compa
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
-      className="h-full"
+      className={`h-full${compact ? ' listing-card--compact' : ''}`}
     >
       <Link to={`/listing/${listing.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121416] transition duration-300 hover:-translate-y-1 hover:border-ember/40 hover:shadow-soft">
         <div className="relative overflow-hidden">
-          {image ? <LoadingImage src={thumbUrl(image)} alt={listing.title} loading="lazy" className={`aspect-[4/3] w-full ${status === 'sold' ? 'opacity-60' : ''}`} imageClassName={`transition duration-500 group-hover:scale-105 ${status === 'sold' ? 'grayscale' : ''}`} /> : <div className="aspect-[4/3] bg-black/20" />}
-          {(!isPart || status === 'sold' || status === 'reserved') && (
+          {image ? <LoadingImage src={thumbUrl(image)} alt={listing.title} loading="lazy" className={`${compact ? 'aspect-[3/2]' : 'aspect-[4/3]'} w-full ${status === 'sold' ? 'opacity-60' : ''}`} imageClassName={`transition duration-500 group-hover:scale-105 ${status === 'sold' ? 'grayscale' : ''}`} /> : <div className={`${compact ? 'aspect-[3/2]' : 'aspect-[4/3]'} bg-black/20`} />}
+          {!compact && (!isPart || status === 'sold' || status === 'reserved') && (
             <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${status === 'sold' ? 'bg-neutral-800' : status === 'reserved' ? 'bg-amber-500' : 'bg-emerald-600'}`}>{status === 'sold' ? 'Vendu' : status === 'reserved' ? 'Réservé' : 'Disponible'}</span>
           )}
           <button
@@ -809,15 +816,17 @@ const ListingCard = memo(function ListingCard({ listing }: { listing: any; compa
             <Heart size={18} className={liked ? 'fill-red-500 text-red-500' : ''} />
           </button>
         </div>
-        <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
-          <h3 className="line-clamp-1 text-base font-semibold text-white sm:text-lg">{heading}</h3>
+        <div className={`flex flex-1 flex-col gap-2 p-3 sm:p-4${compact ? ' listing-card__content' : ''}`}>
+          <h3 className={`line-clamp-1 font-semibold text-white ${compact ? 'text-sm sm:text-base' : 'text-base sm:text-lg'}`}>{heading}</h3>
+          {listing.sellerCertified && <CertifiedBadge />}
           {listing.availability && <AvailabilityBadge value={listing.availability} className="self-start" />}
-          <div className="text-xl font-bold text-white sm:text-2xl">{formatPrice(listing.price)}</div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone/80 sm:text-sm">
-            {listing.city && <span className="inline-flex items-center gap-1"><MapPin size={14} />{listing.city}</span>}
-            {ago && <span className="inline-flex items-center gap-1"><Clock size={14} />{ago}</span>}
+            {listing.city && <span className="inline-flex items-center gap-1">{!compact && <MapPin size={14} />}{listing.city}</span>}
+            {compact && listing.year && <span>• {listing.year}</span>}
+            {!compact && ago && <span className="inline-flex items-center gap-1"><Clock size={14} />{ago}</span>}
           </div>
-          {chips.length > 0 && (
+          <div className={`font-bold text-white ${compact ? 'text-base sm:text-lg' : 'text-xl sm:text-2xl'}`}>{formatPrice(listing.price)}</div>
+          {!compact && chips.length > 0 && (
             <div className="mt-auto flex flex-wrap gap-2 pt-1">
               {chips.map((chip) => <span key={chip} className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-stone">{chip}</span>)}
             </div>
@@ -890,7 +899,7 @@ function CatalogPage() {
 
     const sortedItems = filteredItems.sort((a: any, b: any) => {
       if (sort !== 'featured') return 0;
-      return Number(isRecent(b) ? 1 : 0) - Number(isRecent(a) ? 1 : 0) || (isRecent(a) && isRecent(b) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0);
+      return Number(Boolean(b.sellerPremium)) - Number(Boolean(a.sellerPremium)) || Number(isRecent(b) ? 1 : 0) - Number(isRecent(a) ? 1 : 0) || (isRecent(a) && isRecent(b) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0);
     });
 
     return { filtered: sortedItems, recentCount: sortedItems.filter(isRecent).length };
@@ -903,24 +912,33 @@ function CatalogPage() {
     return <LoadingPanel />;
   }
 
+  const applySearch = () => setSearchParams((previous) => {
+    const next = new URLSearchParams(previous);
+    query.trim() ? next.set('query', query.trim()) : next.delete('query');
+    return next;
+  });
+  const resetSearch = () => {
+    setQuery('');
+    setCity('');
+    setFilters(emptyFilters);
+    setSort('newest');
+    setSearchParams({});
+  };
+
   return (
-    <div className="space-y-8">
-      <section className="rounded-[26px] border border-white/10 bg-[#121416] p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Recherche</div>
-            <h1 className="mt-2 font-display text-5xl uppercase text-white">Market</h1>
-          </div>
-          <div className="flex w-full max-w-xl items-center gap-2 rounded-full border border-white/10 bg-black/20 p-2">
-            <Search size={16} className="ml-2 text-stone" />
-            <input ref={searchInputRef} value={query} onFocus={() => setFiltersOpen(true)} onClick={() => setFiltersOpen(true)} onChange={(e) => setQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') setSearchParams((previous) => { const next = new URLSearchParams(previous); query.trim() ? next.set('query', query.trim()) : next.delete('query'); return next; }); }} placeholder="Nom, marque ou modèle…" className="w-full bg-transparent text-sm text-white placeholder:text-stone/60 focus:outline-none" />
-            <button type="button" onClick={() => setSearchParams((previous) => { const next = new URLSearchParams(previous); query.trim() ? next.set('query', query.trim()) : next.delete('query'); return next; })} className="rounded-full bg-ember px-4 py-2 text-xs uppercase tracking-[0.2em] text-white">GO</button>
-          </div>
+    <div className="catalog-page space-y-5">
+      <section className="catalog-search-panel rounded-[26px] border border-white/10 bg-[#121416] p-5">
+        <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Recherche</div>
+        <h1 className="mt-1 font-display text-4xl uppercase text-white">Marketplace</h1>
+        <div className="catalog-search-bar mt-4 flex w-full items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-1.5">
+          <Search size={18} className="ml-2 shrink-0 text-stone" />
+          <input ref={searchInputRef} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') applySearch(); }} placeholder="Marque, modèle ou mots-clés…" className="w-full bg-transparent text-sm text-white placeholder:text-stone/60 focus:outline-none" />
+          <button type="button" onClick={applySearch} className="rounded-lg bg-ember px-4 py-2 text-sm font-semibold text-white">GO</button>
         </div>
       </section>
 
-      <section className="space-y-6">
-        {filtersOpen && <aside className="rounded-[26px] border border-white/10 bg-[#121416] p-5">
+      <section className="space-y-4">
+        {filtersOpen && <aside id="catalog-detailed-filters" className="rounded-[26px] border border-white/10 bg-[#121416] p-5">
           <div className="mb-4 flex items-center justify-between">
             <div className="text-[10px] uppercase tracking-[0.3em] text-ember">Critères de recherche</div>
             <button type="button" onClick={() => setFiltersOpen(false)} className="text-xs uppercase tracking-[0.2em] text-stone hover:text-white">Fermer</button>
@@ -983,29 +1001,34 @@ function CatalogPage() {
         </aside>}
 
         <div className="space-y-5">
-          <div className="space-y-4 rounded-[24px] border border-white/10 bg-[#121416] p-4">
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_200px]">
-              <label className="block space-y-1.5">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-stone/70">Ville</span>
-                <CityCombobox value={city} onChange={selectCity} placeholder="Toutes les villes du Maroc" className="bg-[#0b0c0e]" />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-stone/70">Trier par</span>
-                <select value={sort} onChange={(e) => setSort(e.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0b0c0e] p-3 text-sm text-white">
-                  <option value="featured">À la une</option>
-                  <option value="price_asc">Prix ↑</option>
-                  <option value="price_desc">Prix ↓</option>
-                  <option value="newest">Nouveautés</option>
-                  <option value="popular">Populaires</option>
-                </select>
-              </label>
+          <div className="catalog-controls">
+            <div className="catalog-select-row">
+              <label className="sr-only" htmlFor="catalog-city">Ville</label>
+              <select id="catalog-city" value={city} onChange={(event) => selectCity(event.target.value)} className="catalog-select">
+                <option value="">Toutes les villes</option>
+                {MOROCCAN_CITIES.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+              <label className="sr-only" htmlFor="catalog-sort">Trier par</label>
+              <select id="catalog-sort" value={sort} onChange={(e) => setSort(e.target.value)} className="catalog-select">
+                <option value="featured">À la une</option>
+                <option value="price_asc">Prix ↑</option>
+                <option value="price_desc">Prix ↓</option>
+                <option value="newest">Nouveautés</option>
+                <option value="popular">Populaires</option>
+              </select>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="catalog-city-chips">
               <button type="button" onClick={() => selectCity('')} className={`rounded-full border px-3 py-1 text-xs transition ${city ? 'border-white/10 text-stone hover:text-white' : 'border-ember bg-ember text-white'}`}>Toutes</button>
-              {popularCities.map((name) => (
+              {popularCities.slice(0, 3).map((name) => (
                 <button key={name} type="button" onClick={() => selectCity(name)} className={`rounded-full border px-3 py-1 text-xs transition ${city === name ? 'border-ember bg-ember text-white' : 'border-white/10 text-stone hover:text-white'}`}>{name}</button>
               ))}
-              <span className="ml-auto text-sm text-stone/80">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</span>
+            </div>
+            <div className="catalog-result-row">
+              <span className="text-sm text-stone/80">{filtered.length} annonce{filtered.length > 1 ? 's' : ''}</span>
+              <button type="button" onClick={() => setFiltersOpen((open) => !open)} className="inline-flex items-center gap-1 text-sm text-stone hover:text-white" aria-expanded={filtersOpen} aria-controls="catalog-detailed-filters">
+                <SlidersHorizontal size={14} /> Filtres{activeFilterCount ? ` (${activeFilterCount})` : ''}
+              </button>
+              <button type="button" onClick={resetSearch} className="text-sm text-ember hover:text-white">Réinitialiser</button>
             </div>
           </div>
           {sort === 'featured' && recentCount > 0 && (
@@ -1107,7 +1130,7 @@ function ListingDetailPage() {
           <div className="rounded-2xl border border-white/10 bg-[#0d0f10] p-4">
             <div className="flex items-center justify-between text-sm text-stone/80">
               <span>Vendeur</span>
-              <span className="text-white">{data.sellerName}</span>
+              <span className="flex flex-wrap items-center justify-end gap-2 text-white">{data.sellerName} {data.sellerCertified && <CertifiedBadge />}</span>
             </div>
             <div className="mt-4 flex items-center justify-between text-sm text-stone/80">
               <span>Note</span>
@@ -1451,6 +1474,7 @@ function MyListingsPage() {
                     <span className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs text-stone">{statusLabels[String(listing.status).toLowerCase()] ?? listing.status}</span>
                   </div>
                   <p className="text-sm text-stone">{[listing.brand, listing.model, listing.city].filter(Boolean).join(' · ')}</p>
+                  {listing.sellerCertified && <CertifiedBadge />}
                   <p className="font-display text-2xl text-ember">{formatPrice(listing.price)}</p>
                   <AvailabilityBadge value={listing.availability} />
                   {(() => {
@@ -2083,6 +2107,48 @@ const formatDuration = (seconds: number) => {
   return minutes > 0 ? `${minutes} min ${String(seconds % 60).padStart(2, '0')} s` : `${seconds} s`;
 };
 
+function UserPremiumControls({ user, refresh }: { user: AdminUser; refresh: () => Promise<void> }) {
+  const [expiresAt, setExpiresAt] = useState('');
+  const [validationError, setValidationError] = useState('');
+  const premium = useMutation({
+    mutationFn: (until: string | null) => setAdminUserPremium(user.id, until),
+    onSuccess: async () => { setExpiresAt(''); setValidationError(''); await refresh(); }
+  });
+  const certification = useMutation({
+    mutationFn: (certified: boolean) => setAdminUserCertification(user.id, certified),
+    onSuccess: refresh
+  });
+  const active = Boolean(user.premiumUntil && new Date(user.premiumUntil).getTime() > Date.now());
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const date = new Date(expiresAt);
+    if (!expiresAt || Number.isNaN(date.getTime()) || date.getTime() <= Date.now()) {
+      setValidationError('Choisissez une date et une heure futures.');
+      return;
+    }
+    setValidationError('');
+    premium.mutate(date.toISOString());
+  };
+  return (
+    <div className="space-y-2">
+      <p className={active ? 'text-amber-400' : 'text-stone/70'}>
+        {active && user.premiumUntil ? `Premium jusqu’au ${new Date(user.premiumUntil).toLocaleString('fr-MA')}` : 'Premium inactif'}
+      </p>
+      <form onSubmit={submit} className="flex flex-wrap gap-2">
+        <label className="sr-only" htmlFor={`premium-expiry-${user.id}`}>Expiration du premium pour {user.firstName} {user.lastName}</label>
+        <input id={`premium-expiry-${user.id}`} type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} required className="rounded-xl border border-white/10 bg-[#0d0f10] p-2 text-xs text-white" />
+        <button type="submit" disabled={premium.isPending} className="rounded-full border border-amber-400/40 px-3 py-2 text-xs text-white disabled:opacity-50">{active ? 'Modifier' : 'Activer'}</button>
+        {user.premiumUntil && <button type="button" disabled={premium.isPending} onClick={() => premium.mutate(null)} className="rounded-full border border-white/10 px-3 py-2 text-xs text-white disabled:opacity-50">Retirer premium</button>}
+      </form>
+      <button type="button" disabled={certification.isPending} onClick={() => certification.mutate(!user.speedshiftCertified)} className="rounded-full border border-blue-400/40 px-3 py-2 text-xs text-white disabled:opacity-50">
+        {user.speedshiftCertified ? 'Retirer la certification' : 'Certifier SpeedShift'}
+      </button>
+      {user.speedshiftCertified && <CertifiedBadge />}
+      {(validationError || premium.isError || certification.isError) && <p role="alert" className="text-xs text-red-400">{validationError || 'Action impossible. Vérifiez vos droits et réessayez.'}</p>}
+    </div>
+  );
+}
+
 function AdminPage() {
   const t = useT();
   const currentUserEmail = useAuthStore((state) => state.user?.email);
@@ -2108,7 +2174,8 @@ function AdminPage() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['admin'] }),
       queryClient.invalidateQueries({ queryKey: ['home'] }),
-      queryClient.invalidateQueries({ queryKey: ['listings'] })
+      queryClient.invalidateQueries({ queryKey: ['listings'] }),
+      queryClient.invalidateQueries({ queryKey: ['listing'] })
     ]);
   };
 
@@ -2288,7 +2355,7 @@ function AdminPage() {
           <div className="flex flex-col gap-4 rounded-[24px] border border-white/10 bg-[#121416] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="font-display text-3xl uppercase text-white">Gestion des utilisateurs</h2>
-              <p className="text-sm text-stone/70">Suspendre ou réactiver un compte, et gérer les rôles.</p>
+              <p className="text-sm text-stone/70">Gérer les rôles, le premium et la certification des comptes.</p>
             </div>
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher nom, e-mail ou téléphone" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white placeholder:text-stone/50 sm:max-w-sm" />
           </div>
@@ -2296,7 +2363,7 @@ function AdminPage() {
             <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-[#121416]">
               <table className="w-full min-w-[900px] text-left text-sm">
                 <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-stone/60">
-                  <tr><th className="p-4">Utilisateur</th><th className="p-4">Téléphone</th><th className="p-4">Inscription</th><th className="p-4">Rôle</th><th className="p-4">État</th><th className="p-4">Actions</th></tr>
+                  <tr><th className="p-4">Utilisateur</th><th className="p-4">Téléphone</th><th className="p-4">Inscription</th><th className="p-4">Rôle</th><th className="p-4">État</th><th className="p-4">Premium et certification</th><th className="p-4">Actions</th></tr>
                 </thead>
                 <tbody>
                   {usersQuery.data.filter((user) => `${user.firstName} ${user.lastName} ${user.email} ${user.phone ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((user) => (
@@ -2306,6 +2373,7 @@ function AdminPage() {
                       <td className="p-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-MA') : '—'}</td>
                       <td className="p-4">{user.role === 'ADMIN' ? 'Administrateur' : 'Client'}</td>
                       <td className="p-4"><span className={user.enabled ? 'text-emerald-400' : 'text-red-400'}>{user.enabled ? 'Actif' : 'Suspendu'}</span></td>
+                      <td className="min-w-[320px] p-4"><UserPremiumControls user={user} refresh={refreshAdminData} /></td>
                       <td className="space-x-2 p-4">
                         <button type="button" disabled={enabledMutation.isPending} onClick={() => enabledMutation.mutate({ id: user.id, enabled: !user.enabled })} className="rounded-full border border-white/10 px-3 py-2 text-xs text-white disabled:opacity-50">
                           {user.enabled ? 'Suspendre' : 'Réactiver'}

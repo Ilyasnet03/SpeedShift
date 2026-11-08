@@ -159,6 +159,18 @@ export async function setAdminUserRole(id: number, role: 'CLIENT' | 'ADMIN') {
   });
 }
 
+export async function setAdminUserPremium(id: number, premiumUntil: string | null) {
+  return request<AdminUser>(`/admin/users/${id}/premium`, {
+    method: 'PATCH', body: JSON.stringify({ active: premiumUntil !== null, premiumUntil })
+  });
+}
+
+export async function setAdminUserCertification(id: number, certified: boolean) {
+  return request<AdminUser>(`/admin/users/${id}/certification`, {
+    method: 'PATCH', body: JSON.stringify({ certified })
+  });
+}
+
 export async function deleteAdminUser(id: number) {
   return request<void>(`/admin/users/${id}`, { method: 'DELETE' });
 }
@@ -343,6 +355,8 @@ export type AdminUser = {
   role: 'CLIENT' | 'ADMIN';
   enabled: boolean;
   createdAt: string | null;
+  premiumUntil: string | null;
+  speedshiftCertified: boolean;
 };
 
 export type AdminListingStatus = 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
@@ -367,6 +381,7 @@ export type AdminListing = {
   fuel?: string | null;
   transmission?: string | null;
   sellerId?: number | null;
+  sellerCertified?: boolean;
   showPhone?: boolean | null;
   expiresAt?: string | null;
 };
