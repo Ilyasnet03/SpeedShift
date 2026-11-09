@@ -749,16 +749,16 @@ export function AdminAuditTab() {
   if (data.length === 0) return <p className="text-stone">{t('Aucune entrée.')}</p>;
   return (
     <div className="overflow-x-auto rounded-3xl border border-white/10 bg-[#121416]">
-      <table className="w-full min-w-[600px] text-left text-sm">
+      <table className="admin-responsive-table w-full min-w-[600px] text-left text-sm">
         <thead className="text-xs uppercase text-stone"><tr><th className="p-3">Date</th><th className="p-3">Admin</th><th className="p-3">Action</th><th className="p-3">Cible</th><th className="p-3">Détails</th></tr></thead>
         <tbody>
           {data.map((entry) => (
             <tr key={entry.id} className="border-t border-white/5 text-stone">
-              <td className="whitespace-nowrap p-3">{new Date(entry.createdAt).toLocaleString()}</td>
-              <td className="p-3">{entry.adminEmail}</td>
-              <td className="p-3 text-white">{entry.action}</td>
-              <td className="p-3">{entry.targetType} {entry.targetId ?? ''}</td>
-              <td className="p-3">{entry.details}</td>
+              <td data-label="Date" className="whitespace-nowrap p-3">{new Date(entry.createdAt).toLocaleString()}</td>
+              <td data-label="Admin" className="p-3">{entry.adminEmail}</td>
+              <td data-label="Action" className="p-3 text-white">{entry.action}</td>
+              <td data-label="Cible" className="p-3">{entry.targetType} {entry.targetId ?? ''}</td>
+              <td data-label="Détails" className="p-3">{entry.details}</td>
             </tr>
           ))}
         </tbody>

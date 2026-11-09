@@ -302,6 +302,7 @@ function RequireAuth({ children, adminOnly = false }: { children: ReactNode; adm
 function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleTheme: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuthStore();
+  const isAdminPage = useLocation().pathname === '/admin';
   const t = useT();
   const compareCount = useCompareStore((state) => state.ids.length);
   const { data: unread } = useUnreadCount(Boolean(user), user?.email);
@@ -318,9 +319,9 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   );
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur">
+    <header className={`sticky top-0 z-40 border-b border-white/10 bg-carbon/90 backdrop-blur${isAdminPage ? ' admin-header' : ''}`}>
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        <Link to="/catalog" className="flex items-center gap-2 sm:gap-3">
+        <Link to="/catalog" className="admin-header__brand flex items-center gap-2 sm:gap-3">
           <img src={logoSpeedshift} alt="SpeedShift" className="h-9 w-9 rounded-full object-cover sm:h-10 sm:w-10" />
           <div>
             <div className="font-display text-2xl uppercase leading-none text-white sm:text-3xl">SpeedShift</div>
@@ -328,7 +329,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
           </div>
         </Link>
 
-        <nav aria-label="Navigation principale" className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 md:flex">
+        <nav aria-label="Navigation principale" className="admin-header__desktop hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 md:flex">
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={item.to === '/messages' ? enableMessageNotifications : undefined} className={({ isActive }) => `rounded-full px-4 py-2 text-sm transition ${isActive ? 'bg-ember text-white' : 'text-stone hover:text-white'}`}>
               {navLabel(item)}
@@ -336,7 +337,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="admin-header__desktop hidden items-center gap-3 md:flex">
           <LanguageSwitcher />
           {compareCount > 0 && <Link to="/compare" className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white">{t('Comparateur')} ({compareCount})</Link>}
           {user ? (
@@ -352,7 +353,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
           </button>
         </div>
 
-        <div className="flex items-center gap-2 md:hidden">
+        <div className="admin-header__mobile flex items-center gap-2 md:hidden">
           <LanguageSwitcher />
           <button type="button" onClick={onToggleTheme} aria-label={theme === 'dark' ? 'Activer le mode clair' : 'Activer le mode sombre'} className="rounded-full border border-white/10 p-2 text-stone">
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -365,7 +366,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
 
       <AnimatePresence>
         {menuOpen && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-white/10 bg-carbon md:hidden">
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="admin-header__mobile-menu border-t border-white/10 bg-carbon md:hidden">
             <nav aria-label="Navigation mobile" className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4">
               {navItems.map((item) => (
                 <NavLink key={item.to} to={item.to} end={item.to === '/'} className="rounded-xl px-3 py-2 text-sm text-stone hover:bg-white/5" onClick={() => { if (item.to === '/messages') enableMessageNotifications(); setMenuOpen(false); }}>
@@ -1964,13 +1965,13 @@ function DashboardOverview({ stats, overview, users, listings, views, visits, ac
       {([['Communauté', [0, 1, 6, 5]], ['Annonces', [2, 3, 4, 7]], ['Audience', [8, 9, 10, 11]]] as [string, number[]][]).map(([group, indexes]) => (
         <div key={group} className="space-y-3">
           <h2 className="text-xs uppercase tracking-[0.28em] text-ember">{group}</h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             {indexes.map((index) => {
               const [label, value, hint] = kpis[index];
               return (
-                <article key={label} className={`${card} border-t-2 border-t-ember/60`}>
-                  <h3 className="text-xs uppercase tracking-[0.2em] text-stone/70">{label}</h3>
-                  <p className="mt-2 font-display text-4xl uppercase text-white">{value}</p>
+                <article key={label} className={`${card} min-w-0 border-t-2 border-t-ember/60 !p-3 sm:!p-5`}>
+                  <h3 className="text-xs uppercase tracking-[0.12em] text-stone/70 sm:tracking-[0.2em]">{label}</h3>
+                  <p className="mt-2 break-words font-display text-3xl uppercase text-white sm:text-4xl">{value}</p>
                   <p className="mt-1 text-xs text-stone/70">{hint}</p>
                 </article>
               );
@@ -2130,7 +2131,7 @@ function UserPremiumControls({ user, refresh }: { user: AdminUser; refresh: () =
     premium.mutate(date.toISOString());
   };
   return (
-    <div className="space-y-2">
+    <div className="admin-premium-controls space-y-2">
       <p className={active ? 'text-amber-400' : 'text-stone/70'}>
         {active && user.premiumUntil ? `Premium jusqu’au ${new Date(user.premiumUntil).toLocaleString('fr-MA')}` : 'Premium inactif'}
       </p>
@@ -2228,22 +2229,22 @@ function AdminPage() {
     `rounded-full px-5 py-3 text-sm font-medium transition ${section === tab ? 'bg-ember text-white' : 'border border-white/10 bg-white/5 text-stone hover:text-white'}`;
 
   return (
-    <div className="space-y-8">
+    <div className="admin-page space-y-6 sm:space-y-8">
       <div>
         <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Espace sécurisé</div>
         <h1 className="mt-2 font-display text-4xl uppercase text-white sm:text-5xl">Dashboard admin</h1>
         <p className="mt-3 text-stone/75">Statistiques, comptes et annonces de la marketplace.</p>
       </div>
 
-      <nav aria-label="Sections du dashboard" className="flex flex-wrap gap-3">
-        <button type="button" className={tabClass('stats')} onClick={() => { setSection('stats'); setSearch(''); }}>Dashboard</button>
-        <button type="button" className={tabClass('users')} onClick={() => { setSection('users'); setSearch(''); }}>Utilisateurs</button>
-        <button type="button" className={tabClass('listings')} onClick={() => { setSection('listings'); setSearch(''); }}>Annonces</button>
-        <button type="button" className={tabClass('views')} onClick={() => { setSection('views'); setSearch(''); }}>Consultations</button>
-        <button type="button" className={tabClass('visits')} onClick={() => { setSection('visits'); setSearch(''); }}>Visiteurs</button>
-        <button type="button" className={tabClass('analytics')} onClick={() => { setSection('analytics'); setSearch(''); }}>{t('Analyses')}</button>
-        <button type="button" className={tabClass('reports')} onClick={() => { setSection('reports'); setSearch(''); }}>{t('Signalements')}</button>
-        <button type="button" className={tabClass('audit')} onClick={() => { setSection('audit'); setSearch(''); }}>{t('Journal d\'audit')}</button>
+      <nav aria-label="Sections du dashboard" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
+        <button type="button" aria-pressed={section === 'stats'} className={tabClass('stats')} onClick={() => { setSection('stats'); setSearch(''); }}>Dashboard</button>
+        <button type="button" aria-pressed={section === 'users'} className={tabClass('users')} onClick={() => { setSection('users'); setSearch(''); }}>Utilisateurs</button>
+        <button type="button" aria-pressed={section === 'listings'} className={tabClass('listings')} onClick={() => { setSection('listings'); setSearch(''); }}>Annonces</button>
+        <button type="button" aria-pressed={section === 'views'} className={tabClass('views')} onClick={() => { setSection('views'); setSearch(''); }}>Consultations</button>
+        <button type="button" aria-pressed={section === 'visits'} className={tabClass('visits')} onClick={() => { setSection('visits'); setSearch(''); }}>Visiteurs</button>
+        <button type="button" aria-pressed={section === 'analytics'} className={tabClass('analytics')} onClick={() => { setSection('analytics'); setSearch(''); }}>{t('Analyses')}</button>
+        <button type="button" aria-pressed={section === 'reports'} className={tabClass('reports')} onClick={() => { setSection('reports'); setSearch(''); }}>{t('Signalements')}</button>
+        <button type="button" aria-pressed={section === 'audit'} className={tabClass('audit')} onClick={() => { setSection('audit'); setSearch(''); }}>{t('Journal d\'audit')}</button>
       </nav>
 
       {section === 'analytics' && <AdminAnalyticsTab />}
@@ -2300,18 +2301,18 @@ function AdminPage() {
           </div>
           {visitsQuery.isLoading ? <LoadingPanel /> : visitsQuery.isError || !visitsQuery.data ? <ErrorPanel error={visitsQuery.error} onRetry={() => visitsQuery.refetch()} /> : (
             <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-[#121416]">
-              <table className="w-full min-w-[700px] text-left text-sm">
+              <table className="admin-responsive-table w-full min-w-[700px] text-left text-sm">
                 <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-stone/60">
                   <tr><th className="p-4">Date</th><th className="p-4">Visiteur</th><th className="p-4">Page</th></tr>
                 </thead>
                 <tbody>
                   {visitsQuery.data.map((visit) => (
                     <tr key={visit.id} className="border-b border-white/5 text-stone last:border-0">
-                      <td className="p-4">{new Date(visit.visitedAt).toLocaleString('fr-MA')}</td>
-                      <td className="p-4">
+                      <td data-label="Date" className="p-4">{new Date(visit.visitedAt).toLocaleString('fr-MA')}</td>
+                      <td data-label="Visiteur" className="p-4">
                         {visit.userId ? <><div className="font-medium text-white">{visit.firstName} {visit.lastName}</div><div className="text-xs text-stone/60">{visit.email}</div></> : <><div className="font-medium text-white">Anonyme</div><div className="text-xs text-stone/60">#{visit.visitorId.slice(0, 8)}</div></>}
                       </td>
-                      <td className="p-4">{visit.path}</td>
+                      <td data-label="Page" className="p-4">{visit.path}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -2330,16 +2331,16 @@ function AdminPage() {
           </div>
           {viewsQuery.isLoading ? <LoadingPanel /> : viewsQuery.isError || !viewsQuery.data ? <ErrorPanel error={viewsQuery.error} onRetry={() => viewsQuery.refetch()} /> : (
             <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-[#121416]">
-              <table className="w-full min-w-[700px] text-left text-sm">
+              <table className="admin-responsive-table w-full min-w-[700px] text-left text-sm">
                 <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-stone/60">
                   <tr><th className="p-4">Date</th><th className="p-4">Utilisateur</th><th className="p-4">Annonce</th></tr>
                 </thead>
                 <tbody>
                   {viewsQuery.data.map((view) => (
                     <tr key={view.id} className="border-b border-white/5 text-stone last:border-0">
-                      <td className="p-4">{new Date(view.viewedAt).toLocaleString('fr-MA')}</td>
-                      <td className="p-4"><div className="font-medium text-white">{view.firstName} {view.lastName}</div><div className="text-xs text-stone/60">{view.email}</div></td>
-                      <td className="p-4"><Link to={`/listing/${view.listingId}`} className="text-white hover:text-ember">{view.listingTitle}</Link></td>
+                      <td data-label="Date" className="p-4">{new Date(view.viewedAt).toLocaleString('fr-MA')}</td>
+                      <td data-label="Utilisateur" className="p-4"><div className="font-medium text-white">{view.firstName} {view.lastName}</div><div className="text-xs text-stone/60">{view.email}</div></td>
+                      <td data-label="Annonce" className="p-4"><Link to={`/listing/${view.listingId}`} className="text-white hover:text-ember">{view.listingTitle}</Link></td>
                     </tr>
                   ))}
                 </tbody>
@@ -2361,20 +2362,20 @@ function AdminPage() {
           </div>
           {usersQuery.isLoading ? <LoadingPanel /> : usersQuery.isError || !usersQuery.data ? <ErrorPanel error={usersQuery.error} onRetry={() => usersQuery.refetch()} /> : (
             <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-[#121416]">
-              <table className="w-full min-w-[900px] text-left text-sm">
+              <table className="admin-responsive-table admin-users-table w-full min-w-[900px] text-left text-sm">
                 <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-stone/60">
                   <tr><th className="p-4">Utilisateur</th><th className="p-4">Téléphone</th><th className="p-4">Inscription</th><th className="p-4">Rôle</th><th className="p-4">État</th><th className="p-4">Premium et certification</th><th className="p-4">Actions</th></tr>
                 </thead>
                 <tbody>
                   {usersQuery.data.filter((user) => `${user.firstName} ${user.lastName} ${user.email} ${user.phone ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((user) => (
                     <tr key={user.id} className="border-b border-white/5 text-stone last:border-0">
-                      <td className="p-4"><div className="font-medium text-white">{user.firstName} {user.lastName}</div><div className="text-xs text-stone/60">{user.email}</div></td>
-                      <td className="p-4">{user.phone ?? '—'}</td>
-                      <td className="p-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-MA') : '—'}</td>
-                      <td className="p-4">{user.role === 'ADMIN' ? 'Administrateur' : 'Client'}</td>
-                      <td className="p-4"><span className={user.enabled ? 'text-emerald-400' : 'text-red-400'}>{user.enabled ? 'Actif' : 'Suspendu'}</span></td>
-                      <td className="min-w-[320px] p-4"><UserPremiumControls user={user} refresh={refreshAdminData} /></td>
-                      <td className="space-x-2 p-4">
+                      <td data-label="Utilisateur" className="p-4"><div className="font-medium text-white">{user.firstName} {user.lastName}</div><div className="text-xs text-stone/60">{user.email}</div></td>
+                      <td data-label="Téléphone" className="p-4">{user.phone ?? '—'}</td>
+                      <td data-label="Inscription" className="p-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-MA') : '—'}</td>
+                      <td data-label="Rôle" className="p-4">{user.role === 'ADMIN' ? 'Administrateur' : 'Client'}</td>
+                      <td data-label="État" className="p-4"><span className={user.enabled ? 'text-emerald-400' : 'text-red-400'}>{user.enabled ? 'Actif' : 'Suspendu'}</span></td>
+                      <td data-label="Premium et certification" className="min-w-[320px] p-4"><UserPremiumControls user={user} refresh={refreshAdminData} /></td>
+                      <td data-label="Actions" className="admin-user-actions space-x-2 p-4">
                         <button type="button" disabled={enabledMutation.isPending} onClick={() => enabledMutation.mutate({ id: user.id, enabled: !user.enabled })} className="rounded-full border border-white/10 px-3 py-2 text-xs text-white disabled:opacity-50">
                           {user.enabled ? 'Suspendre' : 'Réactiver'}
                         </button>
