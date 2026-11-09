@@ -601,11 +601,6 @@ html[data-theme='light'] .bottom-navigation__item.is-publish .bottom-navigation_
     text-transform: uppercase;
   }
 
-  .admin-responsive-table .admin-user-actions > button {
-    min-height: 44px;
-    margin: 0 8px 8px 0;
-  }
-
   .admin-premium-controls input {
     max-width: 100%;
     min-width: 0;

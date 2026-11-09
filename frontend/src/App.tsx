@@ -2157,6 +2157,11 @@ function AdminPage() {
   const [section, setSection] = useState<'stats' | 'users' | 'listings' | 'views' | 'visits' | 'reports' | 'analytics' | 'audit'>('stats');
   const visitsQuery = useQuery({ queryKey: ['admin', 'visits'], queryFn: getAdminSiteVisits, enabled: section === 'visits' || section === 'stats' });
   const [search, setSearch] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const selectedUserHeadingRef = useRef<HTMLHeadingElement>(null);
+  const userSearchRef = useRef<HTMLInputElement>(null);
+  const returningToUsersRef = useRef(false);
+  const selectedUserIdRef = useRef<number | null>(null);
   const viewsQuery = useQuery({ queryKey: ['admin', 'views'], queryFn: getAdminListingViews, enabled: section === 'views' || section === 'stats' });
   const statsQuery = useQuery({ queryKey: ['admin', 'stats'], queryFn: getAdminStats, enabled: section === 'stats' });
   const usersQuery = useQuery({ queryKey: ['admin', 'users'], queryFn: getAdminUsers, enabled: section === 'users' || section === 'stats' });
@@ -2201,6 +2206,34 @@ function AdminPage() {
     onSuccess: refreshAdminData
   });
 
+  useEffect(() => {
+    selectedUserIdRef.current = selectedUserId;
+    if (section !== 'users' || usersQuery.isLoading || usersQuery.isError) return;
+    if (selectedUserId !== null) {
+      selectedUserHeadingRef.current?.focus();
+    } else if (returningToUsersRef.current) {
+      userSearchRef.current?.focus();
+      returningToUsersRef.current = false;
+    }
+  }, [section, selectedUserId, usersQuery.isLoading, usersQuery.isError]);
+
+  const openUser = (id: number) => {
+    enabledMutation.reset();
+    roleMutation.reset();
+    deleteUserMutation.reset();
+    setSelectedUserId(id);
+  };
+  const closeUser = () => {
+    enabledMutation.reset();
+    roleMutation.reset();
+    deleteUserMutation.reset();
+    returningToUsersRef.current = true;
+    setSelectedUserId(null);
+  };
+  const selectedUser = usersQuery.data?.find((user) => user.id === selectedUserId);
+  const matchingUsers = (usersQuery.data ?? []).filter((user) =>
+    `${user.firstName} ${user.lastName} ${user.email} ${user.phone ?? ''}`.toLowerCase().includes(search.toLowerCase())
+  );
   const mutationError = enabledMutation.isError || roleMutation.isError || deleteUserMutation.isError || listingMutation.isError;
   const reportsCount = overviewQuery.data?.openReports ?? 0;
   const exportCsv = () => {
@@ -2356,48 +2389,80 @@ function AdminPage() {
           <div className="flex flex-col gap-4 rounded-[24px] border border-white/10 bg-[#121416] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="font-display text-3xl uppercase text-white">Gestion des utilisateurs</h2>
-              <p className="text-sm text-stone/70">Gérer les rôles, le premium et la certification des comptes.</p>
+              <p className="text-sm text-stone/70">Sélectionnez un compte pour gérer son accès, son rôle et ses avantages.</p>
             </div>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher nom, e-mail ou téléphone" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white placeholder:text-stone/50 sm:max-w-sm" />
+            {selectedUserId === null && <input ref={userSearchRef} value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Rechercher un utilisateur" placeholder="Rechercher nom, e-mail ou téléphone" className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-sm text-white placeholder:text-stone/50 sm:max-w-sm" />}
           </div>
           {usersQuery.isLoading ? <LoadingPanel /> : usersQuery.isError || !usersQuery.data ? <ErrorPanel error={usersQuery.error} onRetry={() => usersQuery.refetch()} /> : (
-            <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-[#121416]">
-              <table className="admin-responsive-table admin-users-table w-full min-w-[900px] text-left text-sm">
-                <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-stone/60">
-                  <tr><th className="p-4">Utilisateur</th><th className="p-4">Téléphone</th><th className="p-4">Inscription</th><th className="p-4">Rôle</th><th className="p-4">État</th><th className="p-4">Premium et certification</th><th className="p-4">Actions</th></tr>
-                </thead>
-                <tbody>
-                  {usersQuery.data.filter((user) => `${user.firstName} ${user.lastName} ${user.email} ${user.phone ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((user) => (
-                    <tr key={user.id} className="border-b border-white/5 text-stone last:border-0">
-                      <td data-label="Utilisateur" className="p-4"><div className="font-medium text-white">{user.firstName} {user.lastName}</div><div className="text-xs text-stone/60">{user.email}</div></td>
-                      <td data-label="Téléphone" className="p-4">{user.phone ?? '—'}</td>
-                      <td data-label="Inscription" className="p-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-MA') : '—'}</td>
-                      <td data-label="Rôle" className="p-4">{user.role === 'ADMIN' ? 'Administrateur' : 'Client'}</td>
-                      <td data-label="État" className="p-4"><span className={user.enabled ? 'text-emerald-400' : 'text-red-400'}>{user.enabled ? 'Actif' : 'Suspendu'}</span></td>
-                      <td data-label="Premium et certification" className="min-w-[320px] p-4"><UserPremiumControls user={user} refresh={refreshAdminData} /></td>
-                      <td data-label="Actions" className="admin-user-actions space-x-2 p-4">
-                        <button type="button" disabled={enabledMutation.isPending} onClick={() => enabledMutation.mutate({ id: user.id, enabled: !user.enabled })} className="rounded-full border border-white/10 px-3 py-2 text-xs text-white disabled:opacity-50">
-                          {user.enabled ? 'Suspendre' : 'Réactiver'}
-                        </button>
-                        <button type="button" disabled={roleMutation.isPending} onClick={() => roleMutation.mutate({ id: user.id, role: user.role === 'ADMIN' ? 'CLIENT' : 'ADMIN' })} className="rounded-full border border-ember/40 px-3 py-2 text-xs text-white disabled:opacity-50">
-                          {user.role === 'ADMIN' ? 'Retirer admin' : 'Rendre admin'}
-                        </button>
-                        {user.email !== currentUserEmail && (
-                          <button type="button" disabled={deleteUserMutation.isPending} onClick={() => {
-                            if (window.confirm(`Supprimer définitivement le compte de ${user.firstName} ${user.lastName} ? Ses annonces resteront publiées sans propriétaire associé.`)) {
-                              deleteUserMutation.mutate(user.id);
-                            }
-                          }} className="rounded-full border border-red-500/40 px-3 py-2 text-xs text-red-400 disabled:opacity-50">
-                            Supprimer
-                          </button>
-                        )}
-                      </td>
-                    </tr>
+            selectedUserId === null ? (
+              <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[#121416]">
+                <div className="border-b border-white/10 px-5 py-4 text-sm text-stone">{matchingUsers.length} utilisateur{matchingUsers.length > 1 ? 's' : ''}</div>
+                <ul>
+                  {matchingUsers.map((user) => (
+                    <li key={user.id} className="border-b border-white/5 last:border-0">
+                      <button type="button" onClick={() => openUser(user.id)} className="flex min-h-[76px] w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ember sm:px-5">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-ember"><UserRound size={20} aria-hidden="true" /></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block break-words font-medium text-white">{user.firstName} {user.lastName}</span>
+                          <span className="block break-all text-xs text-stone/70">{user.email}</span>
+                          <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone">
+                            <span>{user.role === 'ADMIN' ? 'Administrateur' : 'Client'}</span>
+                            <span className={user.enabled ? 'text-emerald-400' : 'text-red-400'}>{user.enabled ? 'Actif' : 'Suspendu'}</span>
+                            {user.premiumUntil && new Date(user.premiumUntil).getTime() > Date.now() && <span className="text-amber-400">Premium</span>}
+                            {user.speedshiftCertified && <span className="text-blue-400">Certifié</span>}
+                          </span>
+                        </span>
+                        <ChevronRight className="shrink-0 text-stone" size={18} aria-hidden="true" />
+                      </button>
+                    </li>
                   ))}
-                </tbody>
-              </table>
-              {usersQuery.data.filter((user) => `${user.firstName} ${user.lastName} ${user.email} ${user.phone ?? ''}`.toLowerCase().includes(search.toLowerCase())).length === 0 && <p className="p-8 text-center text-stone">Aucun utilisateur trouvé.</p>}
-            </div>
+                </ul>
+                {matchingUsers.length === 0 && <p className="p-8 text-center text-stone">Aucun utilisateur trouvé.</p>}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <button type="button" onClick={closeUser} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-stone hover:text-white">
+                  <ArrowLeft size={16} aria-hidden="true" /> Retour à la liste
+                </button>
+                {!selectedUser ? <p role="status" className="rounded-[24px] border border-white/10 bg-[#121416] p-5 text-stone">Cet utilisateur n’est plus disponible.</p> : (
+                  <article className="space-y-5 rounded-[24px] border border-white/10 bg-[#121416] p-5 sm:p-6">
+                    <div className="min-w-0">
+                      <h3 ref={selectedUserHeadingRef} tabIndex={-1} className="break-words font-display text-3xl text-white focus:outline-none">{selectedUser.firstName} {selectedUser.lastName}</h3>
+                      <p className="break-all text-sm text-stone">{selectedUser.email}</p>
+                    </div>
+                    <dl className="grid gap-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm sm:grid-cols-2">
+                      <div><dt className="text-xs text-stone/70">Téléphone</dt><dd className="mt-1 text-white">{selectedUser.phone ?? '—'}</dd></div>
+                      <div><dt className="text-xs text-stone/70">Inscription</dt><dd className="mt-1 text-white">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString('fr-MA') : '—'}</dd></div>
+                      <div><dt className="text-xs text-stone/70">Rôle</dt><dd className="mt-1 text-white">{selectedUser.role === 'ADMIN' ? 'Administrateur' : 'Client'}</dd></div>
+                      <div><dt className="text-xs text-stone/70">État</dt><dd className={`mt-1 ${selectedUser.enabled ? 'text-emerald-400' : 'text-red-400'}`}>{selectedUser.enabled ? 'Actif' : 'Suspendu'}</dd></div>
+                    </dl>
+                    <div className="space-y-3">
+                      <h4 className="text-lg text-white">Premium et certification</h4>
+                      <UserPremiumControls key={selectedUser.id} user={selectedUser} refresh={refreshAdminData} />
+                    </div>
+                    <div className="space-y-3 border-t border-white/10 pt-5">
+                      <h4 className="text-lg text-white">Actions du compte</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" disabled={enabledMutation.isPending} onClick={() => enabledMutation.mutate({ id: selectedUser.id, enabled: !selectedUser.enabled })} className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-white disabled:opacity-50">{selectedUser.enabled ? 'Suspendre' : 'Réactiver'}</button>
+                        <button type="button" disabled={roleMutation.isPending} onClick={() => roleMutation.mutate({ id: selectedUser.id, role: selectedUser.role === 'ADMIN' ? 'CLIENT' : 'ADMIN' })} className="min-h-11 rounded-full border border-ember/40 px-4 py-2 text-sm text-white disabled:opacity-50">{selectedUser.role === 'ADMIN' ? 'Retirer admin' : 'Rendre admin'}</button>
+                        {selectedUser.email !== currentUserEmail && (
+                          <button type="button" disabled={deleteUserMutation.isPending} onClick={() => {
+                            if (window.confirm(`Supprimer définitivement le compte de ${selectedUser.firstName} ${selectedUser.lastName} ? Ses annonces resteront publiées sans propriétaire associé.`)) {
+                              deleteUserMutation.mutate(selectedUser.id, { onSuccess: () => {
+                                if (selectedUserIdRef.current === selectedUser.id) {
+                                  returningToUsersRef.current = true;
+                                  setSelectedUserId(null);
+                                }
+                              } });
+                            }
+                          }} className="min-h-11 rounded-full border border-red-500/40 px-4 py-2 text-sm text-red-400 disabled:opacity-50">Supprimer</button>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                )}
+              </div>
+            )
           )}
         </section>
       )}
