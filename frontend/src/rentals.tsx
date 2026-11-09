@@ -1,11 +1,13 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Search, SlidersHorizontal } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { MOROCCAN_CITIES } from './lib/moroccoCities';
+import { whatsappUrl } from './lib/whatsapp';
 import {
   ApiError, assetUrl, deleteRentalVehicle, getMyRentalAgency, getMyRentalVehicles, getMyRentalQuota,
-  getRentalStore, getRentalVehicles, saveRentalAgency, saveRentalVehicle, uploadImage,
+  getRentalAgencies, getRentalStore, getRentalVehicles, saveRentalAgency, saveRentalVehicle, uploadImage,
   type RentalAgency, type RentalAgencyInput, type RentalVehicle, type RentalVehicleInput
 } from './services/api';
 
@@ -27,31 +29,54 @@ function CityChoices() {
 
 function RentalCard({ vehicle }: { vehicle: RentalVehicle }) {
   const [selected, setSelected] = useState(0);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const invalidDates = Boolean(startDate && endDate && startDate > endDate);
+  const dates = [
+    startDate && `Début souhaité : ${startDate}`,
+    endDate && `Fin souhaitée : ${endDate}`
+  ].filter(Boolean);
+  const message = `Bonjour, je suis intéressé(e) par la location du véhicule « ${vehicle.title} » (${vehicle.brand} ${vehicle.model}, ${vehicle.year}) à ${price(vehicle.dailyPrice)} sur SpeedShift.${dates.length ? `\n${dates.join('\n')}` : ''}\nEst-il disponible ?`;
+  const contactUrl = whatsappUrl(vehicle.agency.phone, message);
   return (
-    <article className={panelClass}>
-      <img src={assetUrl(vehicle.photos[selected] ?? vehicle.photos[0])} alt={vehicle.title} className="h-52 w-full rounded-xl object-cover" />
+    <article className="min-w-0 rounded-[20px] border border-white/10 bg-[#121416] p-3 sm:rounded-[28px] sm:p-5">
+      <img src={assetUrl(vehicle.photos[selected] ?? vehicle.photos[0])} alt={vehicle.title} className="aspect-[3/2] w-full rounded-xl object-cover" />
       {vehicle.photos.length > 1 && <div className="mt-2 flex gap-2 overflow-auto">
         {vehicle.photos.map((photo, index) => <button key={`${photo}-${index}`} type="button" onClick={() => setSelected(index)} aria-label={`Photo ${index + 1} de ${vehicle.title}`} aria-pressed={selected === index}>
           <img src={assetUrl(photo)} alt="" className={`h-12 w-16 rounded object-cover ${selected === index ? 'ring-2 ring-ember' : ''}`} />
         </button>)}
       </div>}
-      <h2 className="mt-4 text-xl font-semibold text-white">{vehicle.title}</h2>
-      <p className="mt-1 font-semibold text-ember">{price(vehicle.dailyPrice)}</p>
-      <p className="mt-2 text-sm text-stone">{vehicle.brand} {vehicle.model} · {vehicle.year} · {vehicle.category} · {vehicle.fuel} · {vehicle.transmission}</p>
+      <h2 className="mt-3 break-words text-sm font-semibold text-white sm:text-xl">{vehicle.title}</h2>
+      <p className="mt-1 break-words text-sm font-semibold text-ember sm:text-base">{price(vehicle.dailyPrice)}</p>
+      <p className="mt-2 break-words text-xs text-stone sm:text-sm">{vehicle.brand} {vehicle.model} · {vehicle.year} · {vehicle.category} · {vehicle.fuel} · {vehicle.transmission}</p>
       <Link to={`/location/agence/${vehicle.agency.id}`} className="mt-4 flex items-center gap-2 text-white hover:text-ember">
-        <img src={assetUrl(vehicle.agency.logo)} alt="" className="h-10 w-10 rounded-full object-cover" />
-        <span>{vehicle.agency.name} · {vehicle.agency.city}</span>
+        <img src={assetUrl(vehicle.agency.logo)} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover sm:h-10 sm:w-10" />
+        <span className="min-w-0 break-words text-xs sm:text-base">{vehicle.agency.name} · {vehicle.agency.city}</span>
       </Link>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <a className={buttonClass} href={`tel:${vehicle.agency.phone}`}>Appeler l'agence</a>
-        <a className="rounded-full border border-white/20 px-5 py-3 text-sm text-white" href={`mailto:${vehicle.agency.email}?subject=${encodeURIComponent(`Location : ${vehicle.title}`)}`}>Envoyer un e-mail</a>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <a className="rounded-full bg-ember px-2 py-3 text-center text-xs font-medium text-white sm:px-5 sm:text-sm" href={`tel:${vehicle.agency.phone}`}>Appeler l'agence</a>
+        <a className="rounded-full border border-white/20 px-2 py-3 text-center text-xs text-white sm:px-5 sm:text-sm" href={`mailto:${vehicle.agency.email}?subject=${encodeURIComponent(`Location : ${vehicle.title}`)}`}>Envoyer un e-mail</a>
       </div>
+      <details className="mt-3 text-xs text-stone sm:text-sm">
+        <summary className="cursor-pointer">Dates souhaitées (facultatif)</summary>
+        <div className="mt-2 grid grid-cols-1 gap-2">
+          <label className="block min-w-0">Début
+            <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="mt-1 block min-w-0 w-full rounded-lg border border-white/10 bg-[#0d0f10] p-2 text-xs text-white" />
+          </label>
+          <label className="block min-w-0">Fin
+            <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} className="mt-1 block min-w-0 w-full rounded-lg border border-white/10 bg-[#0d0f10] p-2 text-xs text-white" />
+          </label>
+          {invalidDates && <p role="alert" className="text-red-400">La date de fin doit suivre la date de début.</p>}
+        </div>
+      </details>
+      {contactUrl && !invalidDates ? <a href={contactUrl} target="_blank" rel="noopener noreferrer" className="mt-3 block rounded-full bg-[#25D366] px-2 py-3 text-center text-xs font-medium text-white sm:px-5 sm:text-sm">Contacter sur WhatsApp</a>
+        : <p role="status" className="mt-3 text-xs text-stone">{invalidDates ? 'Corrigez les dates pour contacter l’agence sur WhatsApp.' : 'Numéro WhatsApp indisponible.'}</p>}
     </article>
   );
 }
 
 function VehicleGrid({ vehicles }: { vehicles: RentalVehicle[] }) {
-  return vehicles.length ? <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{vehicles.map((vehicle) => <RentalCard key={vehicle.id} vehicle={vehicle} />)}</div>
+  return vehicles.length ? <div className="grid grid-cols-2 gap-3 sm:gap-5">{vehicles.map((vehicle) => <RentalCard key={vehicle.id} vehicle={vehicle} />)}</div>
     : <p className="text-stone">Aucun véhicule disponible pour le moment.</p>;
 }
 
@@ -60,31 +85,95 @@ export function RentalCatalogPage() {
   const [min, setMin] = useState('');
   const [max, setMax] = useState('');
   const [transmission, setTransmission] = useState('');
-  const [filters, setFilters] = useState('');
-  const query = useQuery({ queryKey: ['rentals', filters], queryFn: () => getRentalVehicles(new URLSearchParams(filters)) });
-
-  function search(event: FormEvent) {
-    event.preventDefault();
+  const [text, setText] = useState('');
+  const [search, setSearch] = useState('');
+  const [view, setView] = useState<'vehicles' | 'agencies'>('vehicles');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const invalidPrices = Boolean((min && Number(min) < 0) || (max && Number(max) < 0) || (min && max && Number(min) > Number(max)));
+  const filters = useMemo(() => {
     const params = new URLSearchParams();
     if (city.trim()) params.set('city', city.trim());
     if (min) params.set('minPrice', min);
     if (max) params.set('maxPrice', max);
     if (transmission) params.set('transmission', transmission);
-    setFilters(params.toString());
-  }
+    return params.toString();
+  }, [city, min, max, transmission]);
+  const vehiclesQuery = useQuery({
+    queryKey: ['rentals', filters], queryFn: () => getRentalVehicles(new URLSearchParams(filters)),
+    enabled: !invalidPrices
+  });
+  const agenciesQuery = useQuery({ queryKey: ['rental-agencies'], queryFn: getRentalAgencies, enabled: view === 'agencies' });
+  const normalize = (value: string) => value.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const term = normalize(search.trim());
+  const matches = (value: string) => !term || normalize(value).includes(term);
+  const vehicles = vehiclesQuery.data ?? [];
+  const filteredVehicles = vehicles.filter((vehicle) => matches(`${vehicle.title} ${vehicle.brand} ${vehicle.model} ${vehicle.category} ${vehicle.agency.name} ${vehicle.agency.city}`));
+  const agencyResults = (agenciesQuery.data ?? []).flatMap((agency) => {
+    if (city && normalize(agency.city.trim()) !== normalize(city)) return [];
+    const matchingVehicles = vehicles.filter((vehicle) => vehicle.agency.id === agency.id);
+    const agencyMatches = matches(`${agency.name} ${agency.city}`);
+    const relevant = agencyMatches ? matchingVehicles : matchingVehicles.filter((vehicle) => matches(`${vehicle.title} ${vehicle.brand} ${vehicle.model} ${vehicle.category}`));
+    if ((min || max || transmission) && !relevant.length) return [];
+    if (term && !agencyMatches && !relevant.length) return [];
+    return [{ agency, count: relevant.length }];
+  });
+  const count = view === 'vehicles' ? filteredVehicles.length : agencyResults.length;
+  const activeFilters = [min, max, transmission].filter(Boolean).length;
+  const loading = vehiclesQuery.isLoading || (view === 'agencies' && agenciesQuery.isLoading);
+  const failed = vehiclesQuery.isError || (view === 'agencies' && agenciesQuery.isError);
+  const reset = () => { setText(''); setSearch(''); setCity(''); setMin(''); setMax(''); setTransmission(''); };
 
-  return <section className="space-y-6">
-    <div><h1 className="font-display text-4xl uppercase text-white">Location de véhicules</h1><p className="mt-2 text-stone">Découvrez les véhicules des agences partenaires.</p></div>
-    <form onSubmit={search} className={`${panelClass} grid gap-3 md:grid-cols-5`}>
-      <label className="text-sm text-stone">Ville<input list="rental-cities" value={city} onChange={(e) => setCity(e.target.value)} className={`${fieldClass} mt-1`} /></label>
-      <label className="text-sm text-stone">Prix minimum / jour<input type="number" min="0" step="0.01" value={min} onChange={(e) => setMin(e.target.value)} className={`${fieldClass} mt-1`} /></label>
-      <label className="text-sm text-stone">Prix maximum / jour<input type="number" min="0" step="0.01" value={max} onChange={(e) => setMax(e.target.value)} className={`${fieldClass} mt-1`} /></label>
-      <label className="text-sm text-stone">Boîte de vitesses<select value={transmission} onChange={(e) => setTransmission(e.target.value)} className={`${fieldClass} mt-1`}><option value="">Toutes</option><option>Manuelle</option><option>Automatique</option></select></label>
-      <button className={`${buttonClass} self-end`} type="submit">Rechercher</button>
-      <CityChoices />
-    </form>
-    {query.isLoading ? <p>Chargement…</p> : query.isError ? <p role="alert">Impossible de charger les locations. Vérifiez vos filtres et réessayez.</p> : <VehicleGrid vehicles={query.data ?? []} />}
-  </section>;
+  return <div className="catalog-page space-y-5">
+    <section className="catalog-search-panel rounded-[26px] border border-white/10 bg-[#121416] p-5">
+      <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Recherche</div>
+      <h1 className="mt-1 font-display text-4xl uppercase text-white">Location de véhicules</h1>
+      <form onSubmit={(event) => { event.preventDefault(); setSearch(text.trim()); }} className="catalog-search-bar mt-4 flex w-full items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-1.5">
+        <Search size={18} className="ml-2 shrink-0 text-stone" />
+        <input aria-label="Rechercher une location ou une agence" value={text} onChange={(event) => setText(event.target.value)} placeholder="Marque, modèle, agence ou mots-clés…" className="w-full bg-transparent text-sm text-white placeholder:text-stone/60 focus:outline-none" />
+        <button type="submit" className="rounded-lg bg-ember px-4 py-2 text-sm font-semibold text-white">GO</button>
+      </form>
+    </section>
+    <section className="space-y-4">
+      {filtersOpen && <aside id="rental-detailed-filters" className="rounded-[26px] border border-white/10 bg-[#121416] p-5">
+        <div className="mb-4 flex items-center justify-between"><div className="text-[10px] uppercase tracking-[0.3em] text-ember">Critères de recherche</div><button type="button" onClick={() => setFiltersOpen(false)} className="text-xs uppercase tracking-[0.2em] text-stone hover:text-white">Fermer</button></div>
+        <div className="grid gap-4 text-sm text-stone sm:grid-cols-2">
+          <div className="space-y-2"><span>Prix par jour (DH)</span><div className="grid grid-cols-2 gap-2">
+            <input aria-label="Prix minimum par jour" type="number" min="0" step="0.01" value={min} onChange={(event) => setMin(event.target.value)} placeholder="Min" className={fieldClass} />
+            <input aria-label="Prix maximum par jour" type="number" min="0" step="0.01" value={max} onChange={(event) => setMax(event.target.value)} placeholder="Max" className={fieldClass} />
+          </div></div>
+          <label className="block space-y-2"><span>Boîte de vitesses</span><select value={transmission} onChange={(event) => setTransmission(event.target.value)} className={fieldClass}><option value="">Toutes</option><option>Manuelle</option><option>Automatique</option></select></label>
+        </div>
+      </aside>}
+      {invalidPrices && <p role="alert" className="text-sm text-red-400">Les prix doivent être positifs et le minimum ne peut pas dépasser le maximum.</p>}
+      <div className="catalog-controls">
+        <div className="catalog-select-row">
+          <label className="sr-only" htmlFor="rental-city">Ville</label>
+          <input id="rental-city" list="rental-catalog-cities" value={city} onChange={(event) => setCity(event.target.value)} placeholder="Toutes les villes" className="catalog-select" />
+          <datalist id="rental-catalog-cities">{MOROCCAN_CITIES.map((name) => <option key={name} value={name} />)}</datalist>
+        </div>
+        <div className="catalog-city-chips">
+          {['', 'Casablanca', 'Rabat', 'Marrakech'].map((name) => <button key={name} type="button" onClick={() => setCity(name)} className={`rounded-full border px-3 py-1 text-xs transition ${city === name ? 'border-ember bg-ember text-white' : 'border-white/10 text-stone hover:text-white'}`}>{name || 'Toutes'}</button>)}
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Affichage des locations">
+          <button type="button" aria-pressed={view === 'vehicles'} onClick={() => setView('vehicles')} className={`rounded-full border px-4 py-2 text-sm ${view === 'vehicles' ? 'border-ember bg-ember text-white' : 'border-white/10 text-stone'}`}>Par véhicule</button>
+          <button type="button" aria-pressed={view === 'agencies'} onClick={() => setView('agencies')} className={`rounded-full border px-4 py-2 text-sm ${view === 'agencies' ? 'border-ember bg-ember text-white' : 'border-white/10 text-stone'}`}>Par agence</button>
+        </div>
+        <div className="catalog-result-row">
+          <span className="text-sm text-stone/80">{invalidPrices || loading || failed ? 'Résultats indisponibles' : `${count} ${view === 'vehicles' ? `véhicule${count > 1 ? 's' : ''}` : `agence${count > 1 ? 's' : ''}`}`}</span>
+          <button type="button" onClick={() => setFiltersOpen((open) => !open)} className="inline-flex items-center gap-1 text-sm text-stone hover:text-white" aria-expanded={filtersOpen} aria-controls="rental-detailed-filters"><SlidersHorizontal size={14} /> Filtres{activeFilters ? ` (${activeFilters})` : ''}</button>
+          <button type="button" onClick={reset} className="text-sm text-ember hover:text-white">Réinitialiser</button>
+        </div>
+      </div>
+      {view === 'agencies' && <p className="text-sm text-stone">Les filtres de prix et de boîte affichent les agences ayant au moins un véhicule correspondant.</p>}
+      {invalidPrices ? null : loading ? <p role="status">Chargement…</p> : failed ? <p role="alert">Impossible de charger les locations. <button type="button" className="text-ember" onClick={() => { void vehiclesQuery.refetch(); if (view === 'agencies') void agenciesQuery.refetch(); }}>Réessayer</button></p> : view === 'vehicles' ? <VehicleGrid vehicles={filteredVehicles} /> :
+        agencyResults.length ? <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{agencyResults.map(({ agency, count: vehicleCount }) => <article key={agency.id} className={panelClass}>
+          <Link to={`/location/agence/${agency.id}`} className="flex items-center gap-4 text-white hover:text-ember"><img src={assetUrl(agency.logo)} alt="" className="h-16 w-16 rounded-full object-cover" /><div><h2 className="text-xl font-semibold">{agency.name}</h2><p className="text-sm text-stone">{agency.city}</p></div></Link>
+          <p className="mt-4 whitespace-pre-wrap text-sm text-stone">{agency.description}</p>
+          <p className="mt-3 text-sm">{vehicleCount} véhicule{vehicleCount > 1 ? 's' : ''} disponible{vehicleCount > 1 ? 's' : ''}{min || max || transmission || (term && !matches(`${agency.name} ${agency.city}`)) ? ' correspondant' + (vehicleCount > 1 ? 's' : '') : ''}</p>
+          <Link to={`/location/agence/${agency.id}`} className="mt-4 inline-block text-ember">Voir le magasin</Link>
+        </article>)}</div> : <p>Aucune agence ne correspond à votre recherche.</p>}
+    </section>
+  </div>;
 }
 
 export function RentalStorePage() {
@@ -193,6 +282,7 @@ export function RentalDashboardPage() {
     void client.invalidateQueries({ queryKey: ['my-rental-quota'] });
     void client.invalidateQueries({ queryKey: ['rentals'] });
     void client.invalidateQueries({ queryKey: ['rental-store'] });
+    void client.invalidateQueries({ queryKey: ['rental-agencies'] });
   };
   const deletion = useMutation({ mutationFn: deleteRentalVehicle, onSuccess: (_, id) => {
     if (editing?.id === id) { setEditing(null); setFormKey((key) => key + 1); }

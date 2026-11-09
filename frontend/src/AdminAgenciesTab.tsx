@@ -14,6 +14,7 @@ function AgencyDetails({ agency, onBack }: { agency: AdminAgency; onBack: () => 
     client.invalidateQueries({ queryKey: ['admin'] }),
     client.invalidateQueries({ queryKey: ['my-rental-quota'] }),
     client.invalidateQueries({ queryKey: ['rentals'] }),
+    client.invalidateQueries({ queryKey: ['rental-agencies'] }),
     client.invalidateQueries({ queryKey: ['rental-store'] })
   ]);
   const limitMutation = useMutation({

@@ -80,6 +80,10 @@ export function getRentalStore(id: string) {
   return request<{ agency: RentalAgency; vehicles: RentalVehicle[] }>(`/public/rental-agencies/${id}`);
 }
 
+export function getRentalAgencies() {
+  return request<RentalAgency[]>('/public/rental-agencies');
+}
+
 export function getMyRentalAgency() {
   return request<RentalAgency>('/agency');
 }

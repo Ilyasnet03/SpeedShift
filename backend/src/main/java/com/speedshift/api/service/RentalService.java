@@ -110,6 +110,16 @@ public class RentalService {
     }
 
     @Transactional(readOnly = true)
+    public List<AgencyResponse> publicAgencies() {
+        return agencies.findAll().stream()
+            .filter(a -> a.getOwner().isEnabled() && a.getOwner().getRole() == User.Role.AGENCY)
+            .map(this::agencyResponse)
+            .sorted(java.util.Comparator.comparing(AgencyResponse::name, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(AgencyResponse::id))
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<VehicleResponse> available(Long agencyId, String city, BigDecimal min, BigDecimal max, String transmission) {
         if ((min != null && min.signum() < 0) || (max != null && max.signum() < 0)
             || (min != null && max != null && min.compareTo(max) > 0)

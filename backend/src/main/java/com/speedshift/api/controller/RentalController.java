@@ -31,6 +31,11 @@ public class RentalController {
         return rentals.store(id);
     }
 
+    @GetMapping("/public/rental-agencies")
+    public List<AgencyResponse> agencies() {
+        return rentals.publicAgencies();
+    }
+
     @GetMapping("/agency")
     public AgencyResponse myAgency(@AuthenticationPrincipal User user) {
         return rentals.myAgency(user);

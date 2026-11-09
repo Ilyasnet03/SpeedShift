@@ -63,6 +63,33 @@ class RentalIntegrationTest {
     }
 
     @Test
+    void publicAgencyDirectoryIncludesEmptyStoresButHidesSuspendedAccounts() throws Exception {
+        User active = createUser("directory-active@example.test", User.Role.AGENCY);
+        User suspended = createUser("directory-suspended@example.test", User.Role.AGENCY);
+        String agency = """
+            {"name":"Agence Vide","logo":"/uploads/logo.jpg","phone":"+212612345678",
+             "email":"directory@example.test","city":"Rabat","address":"Rue 1","description":"Agence"}
+            """;
+        long activeId = body(mvc.perform(put("/api/agency").header("Authorization", token(active))
+            .contentType(MediaType.APPLICATION_JSON).content(agency)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString()).get("id").asLong();
+        long suspendedId = body(mvc.perform(put("/api/agency").header("Authorization", token(suspended))
+            .contentType(MediaType.APPLICATION_JSON).content(agency.replace("Agence Vide", "Agence Suspendue")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        suspended.setEnabled(false);
+        users.save(suspended);
+        JsonNode directory = body(mvc.perform(get("/api/public/rental-agencies"))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        boolean foundActive = false;
+        for (JsonNode entry : directory) {
+            if (entry.get("id").asLong() == activeId) foundActive = true;
+            assertNotEquals(suspendedId, entry.get("id").asLong());
+            assertFalse(entry.has("owner"));
+        }
+        assertTrue(foundActive);
+    }
+
+    @Test
     void agencyLifecycleFilteringAndOwnership() throws Exception {
         User owner = createUser("owner@example.test", User.Role.AGENCY);
         User other = createUser("other@example.test", User.Role.AGENCY);

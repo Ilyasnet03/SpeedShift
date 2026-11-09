@@ -82,6 +82,7 @@ import { CityCombobox } from './CityCombobox';
 import { MOROCCAN_CITIES } from './lib/moroccoCities';
 import { LoadingIndicator, MutationIndicator } from './LoadingIndicator';
 import { LoadingImage } from './LoadingImage';
+import { whatsappUrl } from './lib/whatsapp';
 import { RentalCatalogPage, RentalStorePage, RentalDashboardPage } from './rentals';
 import { AdminAgenciesTab } from './AdminAgenciesTab';
 import {
@@ -240,6 +241,7 @@ function BottomNavigation() {
   const items = [
     { label: 'Accueil', to: '/catalog', icon: Home, active: (location.pathname === '/catalog' && !isSearching) || location.pathname === '/accueil' },
     { label: 'Recherche', to: '/catalog?search=1', icon: Search, active: isSearching },
+    { label: 'Location', to: '/location', icon: CarFront, active: location.pathname === '/location' || location.pathname.startsWith('/location/') },
     { label: 'Publier', to: '/sell', icon: Plus, active: location.pathname === '/sell' || /^\/listing\/[^/]+\/edit$/.test(location.pathname) },
     { label: 'Messages', to: '/messages', icon: MessageSquare, active: location.pathname === '/messages' || location.pathname.startsWith('/messages/') },
     { label: 'Compte', to: '/account', icon: UserRound, active: location.pathname === '/account' || location.pathname === '/login' }
@@ -1175,13 +1177,9 @@ function ListingDetailPage() {
 }
 
 function buildWhatsAppUrl(phone: string | null | undefined, listing: any) {
-  let digits = (phone ?? '').replace(/\D/g, '');
-  if (!digits) return null;
-  if (digits.startsWith('00')) digits = digits.slice(2);
-  else if (digits.startsWith('0')) digits = `212${digits.slice(1)}`;
   const details = [listing.brand, listing.model, listing.year].filter(Boolean).join(' ');
   const message = `Bonjour, je suis intéressé(e) par votre annonce « ${listing.title} »${details ? ` (${details})` : ''} à ${formatPrice(listing.price)} sur SpeedShift. Est-elle toujours disponible ?`;
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+  return whatsappUrl(phone, message);
 }
 
 const PARTS_CATEGORY = 'Pièces & Accessoires';

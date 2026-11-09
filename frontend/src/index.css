@@ -400,7 +400,7 @@ html[data-theme='light'] .chat-listing-info span, html[data-theme='light'] .chat
   bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   display: flex;
-  width: min(440px, calc(100% - 24px));
+  width: min(520px, calc(100% - 16px));
   height: 68px;
   transform: translateX(-50%);
   border: 1px solid #25262a;
@@ -419,9 +419,10 @@ html[data-theme='light'] .chat-listing-info span, html[data-theme='light'] .chat
   justify-content: center;
   gap: 5px;
   color: #a4a4a8;
-  font-size: 10px;
+  font-size: clamp(8px, 2.4vw, 10px);
   line-height: 1;
   text-decoration: none;
+  white-space: nowrap;
   transition: color 180ms ease;
 }
 
