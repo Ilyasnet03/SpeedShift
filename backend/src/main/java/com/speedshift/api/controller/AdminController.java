@@ -12,6 +12,9 @@ import com.speedshift.api.dto.AdminDtos.SiteVisitSummary;
 import com.speedshift.api.dto.AdminDtos.ActivityStats;
 import com.speedshift.api.dto.AdminDtos.AdminOverview;
 import com.speedshift.api.service.AdminOverviewService;
+import com.speedshift.api.service.AdminAgencyService;
+import com.speedshift.api.dto.AdminDtos.AgencySummary;
+import com.speedshift.api.dto.AdminDtos.RentalVehicleLimitUpdate;
 import com.speedshift.api.repository.SiteVisitRepository;
 import com.speedshift.api.repository.VisitorActivityRepository;
 import com.speedshift.api.repository.ListingViewRepository;
@@ -47,8 +50,10 @@ public class AdminController {
     private final VisitorActivityRepository activityRepository;
 
     private final AdminOverviewService overviewService;
+    private final AdminAgencyService agencyService;
 
-    public AdminController(AdminService adminService, ListingViewRepository listingViewRepository, SiteVisitRepository siteVisitRepository, AuditService auditService, VisitorActivityRepository activityRepository, AdminOverviewService overviewService) {
+    public AdminController(AdminService adminService, ListingViewRepository listingViewRepository, SiteVisitRepository siteVisitRepository, AuditService auditService, VisitorActivityRepository activityRepository, AdminOverviewService overviewService, AdminAgencyService agencyService) {
+        this.agencyService = agencyService;
         this.overviewService = overviewService;
         this.adminService = adminService;
         this.listingViewRepository = listingViewRepository;
@@ -87,6 +92,18 @@ public class AdminController {
     @GetMapping("/users")
     public List<UserSummary> getUsers() {
         return adminService.getUsers();
+    }
+
+    @GetMapping("/agencies")
+    public List<AgencySummary> getAgencies() {
+        return agencyService.list();
+    }
+
+    @PatchMapping("/agencies/{userId}/vehicle-limit")
+    public void setAgencyVehicleLimit(@PathVariable Long userId, @Valid @RequestBody RentalVehicleLimitUpdate request,
+        @AuthenticationPrincipal User actor) {
+        agencyService.setLimit(userId, request.limit());
+        auditService.log(actor, "AGENCY_VEHICLE_LIMIT", "USER", userId, "Limite : " + request.limit());
     }
 
     @PatchMapping("/users/{id}/enabled")

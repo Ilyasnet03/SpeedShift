@@ -43,6 +43,91 @@ export async function registerUser(payload: any) {
   });
 }
 
+export type RentalAgency = {
+  id: number;
+  name: string;
+  logo: string;
+  phone: string;
+  email: string;
+  city: string;
+  address: string;
+  description: string;
+};
+
+export type RentalVehicle = {
+  id: number;
+  title: string;
+  brand: string;
+  model: string;
+  year: number;
+  category: string;
+  dailyPrice: number;
+  fuel: string;
+  transmission: string;
+  status: 'ACTIVE' | 'RENTED' | 'PAUSED';
+  photos: string[];
+  agency: RentalAgency;
+};
+
+export type RentalAgencyInput = Omit<RentalAgency, 'id'>;
+export type RentalVehicleInput = Omit<RentalVehicle, 'id' | 'agency'>;
+
+export function getRentalVehicles(filters: URLSearchParams) {
+  return request<RentalVehicle[]>(`/public/rentals?${filters.toString()}`);
+}
+
+export function getRentalStore(id: string) {
+  return request<{ agency: RentalAgency; vehicles: RentalVehicle[] }>(`/public/rental-agencies/${id}`);
+}
+
+export function getMyRentalAgency() {
+  return request<RentalAgency>('/agency');
+}
+
+export function saveRentalAgency(agency: RentalAgencyInput) {
+  return request<RentalAgency>('/agency', { method: 'PUT', body: JSON.stringify(agency) });
+}
+
+export function getMyRentalVehicles() {
+  return request<RentalVehicle[]>('/agency/vehicles');
+}
+
+export function getMyRentalQuota() {
+  return request<{ count: number; limit: number }>('/agency/vehicle-quota');
+}
+
+export type AdminAgency = {
+  userId: number;
+  firstName: string;
+  lastName: string;
+  accountEmail: string;
+  accountPhone: string | null;
+  enabled: boolean;
+  emailVerified: boolean;
+  createdAt: string;
+  vehicleLimit: number;
+  store: RentalAgency | null;
+  vehicles: { id: number; title: string; status: RentalVehicle['status']; dailyPrice: number }[];
+};
+
+export function getAdminAgencies() {
+  return request<AdminAgency[]>('/admin/agencies');
+}
+
+export function setAgencyVehicleLimit(userId: number, limit: number) {
+  return request<void>(`/admin/agencies/${userId}/vehicle-limit`, { method: 'PATCH', body: JSON.stringify({ limit }) });
+}
+
+export function saveRentalVehicle(vehicle: RentalVehicleInput, id?: number) {
+  return request<RentalVehicle>(id === undefined ? '/agency/vehicles' : `/agency/vehicles/${id}`, {
+    method: id === undefined ? 'POST' : 'PUT', body: JSON.stringify(vehicle)
+  });
+}
+
+export function deleteRentalVehicle(id: number) {
+  return request<void>(`/agency/vehicles/${id}`, { method: 'DELETE' });
+}
+
 export async function verifyEmail(email: string, code: string) {
   return request<any>('/auth/verify-email', {
     method: 'POST',
@@ -352,7 +437,7 @@ export type AdminUser = {
   lastName: string;
   email: string;
   phone: string | null;
-  role: 'CLIENT' | 'ADMIN';
+  role: 'CLIENT' | 'AGENCY' | 'ADMIN';
   enabled: boolean;
   createdAt: string | null;
   premiumUntil: string | null;

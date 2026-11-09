@@ -76,6 +76,10 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private boolean speedshiftCertified;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private int rentalVehicleLimit = 5;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -84,6 +88,7 @@ public class User implements UserDetails {
 
     public enum Role {
         CLIENT,
+        AGENCY,
         ADMIN
     }
 

@@ -73,6 +73,7 @@ Les services web gratuits Render peuvent se mettre en veille après une période
 - Catalogue trié par défaut des annonces les plus récentes aux plus anciennes, après les annonces des comptes premium actifs
 - Messagerie avec recherche, filtres non lus/achats/ventes et statut de lecture ; les informations de l'annonce sont fournies par l'API
 - Ajout de jusqu’à 5 photos depuis l’appareil, avec redimensionnement avant envoi
+- Location : inscription dédiée aux nouvelles agences, configuration de leur magasin, gestion de véhicules et catalogue public filtrable par ville, prix journalier et boîte de vitesses
 - API REST avec données de démonstration
 - Dockerisation complète
 
@@ -83,3 +84,11 @@ Les migrations Flyway `V4` et `V5` localisent les annonces de démonstration au 
 La migration `V4` élargit également le stockage des photos : celles envoyées depuis le téléphone sont redimensionnées et enregistrées avec l’annonce dans PostgreSQL, où elles restent disponibles après redémarrage du service.
 
 Dans **Administration → Utilisateurs**, un administrateur peut activer ou retirer le premium d'un compte et choisir une date et une heure d'expiration (dans son fuseau horaire local). Jusqu'à cette échéance, les annonces du compte sont prioritaires dans tous les tris ; le tri choisi s'applique à l'intérieur de chaque groupe. La certification SpeedShift est gérée séparément et son badge apparaît sur les annonces et leur fiche, même après expiration du premium. La migration Flyway `V16` ajoute ces paramètres aux comptes existants sans les activer par défaut.
+
+## Location et agences
+
+Lors de l'inscription, les nouvelles agences sélectionnent « Je m'inscris en tant qu'agence de location » et valident leur adresse e-mail. Après connexion, elles configurent leur magasin dans **Mon agence**, puis ajoutent jusqu'à cinq photos par véhicule. Les annonces actives sont immédiatement visibles dans **Location** ; les véhicules loués ou en pause restent visibles uniquement par leur agence. Les visiteurs peuvent contacter l'agence directement par téléphone ou e-mail : aucune réservation ni aucun paiement ne sont gérés par la plateforme.
+
+La migration Flyway `V17` crée des tables distinctes des annonces de vente. La suspension d'un compte agence masque sa vitrine et ses véhicules ; la suppression du compte supprime aussi son magasin et ses locations. Les images utilisent le service d'upload existant.
+
+Dans **Administration → Agences**, l’administrateur consulte les comptes, vitrines et véhicules, suspend ou réactive un compte et peut le supprimer. Il définit également un plafond individuel de véhicules : la migration `V18` fixe cinq véhicules par défaut pour les comptes existants et futurs. Tous les véhicules comptent, même loués ou en pause. Si un plafond est réduit sous le nombre existant, aucun véhicule n’est supprimé, mais les ajouts restent bloqués tant que le nombre n’est pas inférieur au plafond.

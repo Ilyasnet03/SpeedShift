@@ -82,6 +82,8 @@ import { CityCombobox } from './CityCombobox';
 import { MOROCCAN_CITIES } from './lib/moroccoCities';
 import { LoadingIndicator, MutationIndicator } from './LoadingIndicator';
 import { LoadingImage } from './LoadingImage';
+import { RentalCatalogPage, RentalStorePage, RentalDashboardPage } from './rentals';
+import { AdminAgenciesTab } from './AdminAgenciesTab';
 import {
   AdminAnalyticsTab,
   AdminAuditTab,
@@ -160,6 +162,7 @@ const dataUrlToBlob = async (dataUrl: string) => (await fetch(dataUrl)).blob();
 const appNavItems = [
   { label: 'Favoris', to: '/favorites' },
   { label: 'Market', to: '/catalog' },
+  { label: 'Location', to: '/location' },
   { label: 'Mes annonces', to: '/my-listings' },
   { label: 'Poster une annonce', to: '/sell' }
 ];
@@ -197,6 +200,9 @@ function App() {
           <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />
           <Route path="/marketplace" element={<Navigate to="/catalog" replace />} />
           <Route path="/catalog" element={<CatalogPage />} />
+          <Route path="/location" element={<RentalCatalogPage />} />
+          <Route path="/location/agence/:id" element={<RentalStorePage />} />
+          <Route path="/agence" element={<RequireAuth><RentalDashboardPage /></RequireAuth>} />
           <Route path="/favorites" element={<RequireAuth><FavoritesPage /></RequireAuth>} />
           <Route path="/my-listings" element={<RequireAuth><MyListingsPage /></RequireAuth>} />
           <Route path="/listing/:id" element={<ListingDetailPage />} />
@@ -280,6 +286,7 @@ function AccountPage() {
       <div className="mt-6 flex flex-wrap gap-3">
         <Link to="/my-listings" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white">{t('Mes annonces')}</Link>
         <Link to="/favorites" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white">{t('Favoris')}</Link>
+        {user.role === 'AGENCY' && <Link to="/agence" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white">Mon magasin de location</Link>}
         <button type="button" onClick={logout} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white">{t('Déconnexion')}</button>
       </div>
     </div>
@@ -309,8 +316,8 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
   const unreadCount = unread?.count ?? 0;
 
   const navItems = user
-    ? [...appNavItems, { label: 'Messages', to: '/messages' }, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
-    : [{ label: 'Market', to: '/catalog' }, { label: 'Vendre', to: '/sell' }];
+    ? [...appNavItems, ...(user.role === 'AGENCY' ? [{ label: 'Mon agence', to: '/agence' }] : []), { label: 'Messages', to: '/messages' }, ...(user.role === 'ADMIN' ? [{ label: 'Administration', to: '/admin' }] : [])]
+    : [{ label: 'Market', to: '/catalog' }, { label: 'Location', to: '/location' }, { label: 'Vendre', to: '/sell' }];
   const navLabel = (item: { label: string; to: string }) => (
     <span className="relative inline-flex items-center">
       {t(item.label)}
@@ -1562,6 +1569,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [agency, setAgency] = useState(false);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -1601,7 +1609,7 @@ function LoginPage() {
       refreshToken: response.refreshToken
     });
     const from = (location.state as { from?: string } | null)?.from;
-    navigate(response.role === 'ADMIN' ? '/admin' : from && from.startsWith('/') ? from : '/catalog');
+    navigate(response.role === 'ADMIN' ? '/admin' : from && from.startsWith('/') ? from : response.role === 'AGENCY' ? '/agence' : '/catalog');
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1620,7 +1628,8 @@ function LoginPage() {
         lastName: form.lastName,
         email: form.email,
         phone: `+212${form.phone.replace(/\D/g, '')}`,
-        password: form.password
+        password: form.password,
+        agency
       });
       setCode('');
       setPendingEmail(form.email);
@@ -1797,6 +1806,12 @@ function LoginPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+        {mode === 'register' && (
+          <label className="flex items-center gap-2 text-sm text-stone">
+            <input type="checkbox" checked={agency} onChange={(event) => setAgency(event.target.checked)} />
+            Je m'inscris en tant qu'agence de location
+          </label>
+        )}
         {mode === 'register' && (
           <div className="grid gap-4 sm:grid-cols-2">
             <input required value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white placeholder:text-stone/60" placeholder="Prénom" />
@@ -2154,7 +2169,7 @@ function AdminPage() {
   const t = useT();
   const currentUserEmail = useAuthStore((state) => state.user?.email);
   const queryClient = useQueryClient();
-  const [section, setSection] = useState<'stats' | 'users' | 'listings' | 'views' | 'visits' | 'reports' | 'analytics' | 'audit'>('stats');
+  const [section, setSection] = useState<'stats' | 'users' | 'agencies' | 'listings' | 'views' | 'visits' | 'reports' | 'analytics' | 'audit'>('stats');
   const visitsQuery = useQuery({ queryKey: ['admin', 'visits'], queryFn: getAdminSiteVisits, enabled: section === 'visits' || section === 'stats' });
   const [search, setSearch] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -2272,6 +2287,7 @@ function AdminPage() {
       <nav aria-label="Sections du dashboard" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
         <button type="button" aria-pressed={section === 'stats'} className={tabClass('stats')} onClick={() => { setSection('stats'); setSearch(''); }}>Dashboard</button>
         <button type="button" aria-pressed={section === 'users'} className={tabClass('users')} onClick={() => { setSection('users'); setSearch(''); }}>Utilisateurs</button>
+        <button type="button" aria-pressed={section === 'agencies'} className={tabClass('agencies')} onClick={() => { setSection('agencies'); setSearch(''); }}>Agences</button>
         <button type="button" aria-pressed={section === 'listings'} className={tabClass('listings')} onClick={() => { setSection('listings'); setSearch(''); }}>Annonces</button>
         <button type="button" aria-pressed={section === 'views'} className={tabClass('views')} onClick={() => { setSection('views'); setSearch(''); }}>Consultations</button>
         <button type="button" aria-pressed={section === 'visits'} className={tabClass('visits')} onClick={() => { setSection('visits'); setSearch(''); }}>Visiteurs</button>
@@ -2281,6 +2297,7 @@ function AdminPage() {
       </nav>
 
       {section === 'analytics' && <AdminAnalyticsTab />}
+      {section === 'agencies' && <AdminAgenciesTab />}
       {section === 'reports' && <AdminReportsTab />}
       {section === 'audit' && <AdminAuditTab />}
 
@@ -2406,7 +2423,7 @@ function AdminPage() {
                           <span className="block break-words font-medium text-white">{user.firstName} {user.lastName}</span>
                           <span className="block break-all text-xs text-stone/70">{user.email}</span>
                           <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone">
-                            <span>{user.role === 'ADMIN' ? 'Administrateur' : 'Client'}</span>
+                            <span>{user.role === 'ADMIN' ? 'Administrateur' : user.role === 'AGENCY' ? 'Agence' : 'Client'}</span>
                             <span className={user.enabled ? 'text-emerald-400' : 'text-red-400'}>{user.enabled ? 'Actif' : 'Suspendu'}</span>
                             {user.premiumUntil && new Date(user.premiumUntil).getTime() > Date.now() && <span className="text-amber-400">Premium</span>}
                             {user.speedshiftCertified && <span className="text-blue-400">Certifié</span>}
@@ -2433,7 +2450,7 @@ function AdminPage() {
                     <dl className="grid gap-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm sm:grid-cols-2">
                       <div><dt className="text-xs text-stone/70">Téléphone</dt><dd className="mt-1 text-white">{selectedUser.phone ?? '—'}</dd></div>
                       <div><dt className="text-xs text-stone/70">Inscription</dt><dd className="mt-1 text-white">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString('fr-MA') : '—'}</dd></div>
-                      <div><dt className="text-xs text-stone/70">Rôle</dt><dd className="mt-1 text-white">{selectedUser.role === 'ADMIN' ? 'Administrateur' : 'Client'}</dd></div>
+                      <div><dt className="text-xs text-stone/70">Rôle</dt><dd className="mt-1 text-white">{selectedUser.role === 'ADMIN' ? 'Administrateur' : selectedUser.role === 'AGENCY' ? 'Agence' : 'Client'}</dd></div>
                       <div><dt className="text-xs text-stone/70">État</dt><dd className={`mt-1 ${selectedUser.enabled ? 'text-emerald-400' : 'text-red-400'}`}>{selectedUser.enabled ? 'Actif' : 'Suspendu'}</dd></div>
                     </dl>
                     <div className="space-y-3">
@@ -2444,10 +2461,10 @@ function AdminPage() {
                       <h4 className="text-lg text-white">Actions du compte</h4>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" disabled={enabledMutation.isPending} onClick={() => enabledMutation.mutate({ id: selectedUser.id, enabled: !selectedUser.enabled })} className="min-h-11 rounded-full border border-white/10 px-4 py-2 text-sm text-white disabled:opacity-50">{selectedUser.enabled ? 'Suspendre' : 'Réactiver'}</button>
-                        <button type="button" disabled={roleMutation.isPending} onClick={() => roleMutation.mutate({ id: selectedUser.id, role: selectedUser.role === 'ADMIN' ? 'CLIENT' : 'ADMIN' })} className="min-h-11 rounded-full border border-ember/40 px-4 py-2 text-sm text-white disabled:opacity-50">{selectedUser.role === 'ADMIN' ? 'Retirer admin' : 'Rendre admin'}</button>
+                        {selectedUser.role !== 'AGENCY' && <button type="button" disabled={roleMutation.isPending} onClick={() => roleMutation.mutate({ id: selectedUser.id, role: selectedUser.role === 'ADMIN' ? 'CLIENT' : 'ADMIN' })} className="min-h-11 rounded-full border border-ember/40 px-4 py-2 text-sm text-white disabled:opacity-50">{selectedUser.role === 'ADMIN' ? 'Retirer admin' : 'Rendre admin'}</button>}
                         {selectedUser.email !== currentUserEmail && (
                           <button type="button" disabled={deleteUserMutation.isPending} onClick={() => {
-                            if (window.confirm(`Supprimer définitivement le compte de ${selectedUser.firstName} ${selectedUser.lastName} ? Ses annonces resteront publiées sans propriétaire associé.`)) {
+                            if (window.confirm(`Supprimer définitivement le compte de ${selectedUser.firstName} ${selectedUser.lastName} ? Ses annonces de vente resteront publiées sans propriétaire associé.${selectedUser.role === 'AGENCY' ? ' Son magasin et ses véhicules de location seront supprimés.' : ''}`)) {
                               deleteUserMutation.mutate(selectedUser.id, { onSuccess: () => {
                                 if (selectedUserIdRef.current === selectedUser.id) {
                                   returningToUsersRef.current = true;

@@ -60,9 +60,10 @@ public class AuthenticationService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Un compte existe déjà pour cet email");
         }
         if (user == null) {
-            user = User.builder().email(request.email()).role(User.Role.CLIENT).enabled(true)
+            user = User.builder().email(request.email()).enabled(true)
                 .twoFactorEnabled(false).createdAt(LocalDateTime.now()).build();
         }
+        user.setRole(Boolean.TRUE.equals(request.agency()) ? User.Role.AGENCY : User.Role.CLIENT);
         user.setFirstName(request.firstName());
         user.setLastName(request.lastName());
         user.setPhone(normalizeMoroccanPhone(request.phone()));

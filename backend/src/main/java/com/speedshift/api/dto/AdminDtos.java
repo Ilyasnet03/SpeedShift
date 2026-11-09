@@ -3,6 +3,7 @@ package com.speedshift.api.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Min;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -118,6 +119,16 @@ public final class AdminDtos {
     public record PremiumUpdate(@NotNull Boolean active, Instant premiumUntil) {}
 
     public record CertificationUpdate(@NotNull Boolean certified) {}
+
+    public record RentalVehicleLimitUpdate(@NotNull @Min(1) Integer limit) {}
+
+    public record AgencyVehicleSummary(Long id, String title, String status, BigDecimal dailyPrice) {}
+
+    public record AgencySummary(
+        Long userId, String firstName, String lastName, String accountEmail, String accountPhone,
+        boolean enabled, boolean emailVerified, LocalDateTime createdAt, int vehicleLimit,
+        RentalDtos.AgencyResponse store, List<AgencyVehicleSummary> vehicles
+    ) {}
 
     public record RoleUpdate(
         @NotBlank @Pattern(regexp = "CLIENT|ADMIN") String role

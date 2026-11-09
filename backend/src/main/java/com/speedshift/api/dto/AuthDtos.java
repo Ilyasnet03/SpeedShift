@@ -12,7 +12,8 @@ public class AuthDtos {
         @NotBlank @Size(max = 120) String lastName,
         @NotBlank @Email @Size(max = 255) String email,
         @NotBlank @Pattern(regexp = "(?:\\+212|0)[67][0-9]{8}") String phone,
-        @NotBlank @Size(min = 8, max = 72) String password
+        @NotBlank @Size(min = 8, max = 72) String password,
+        Boolean agency
     ) {}
 
     public record LoginRequest(

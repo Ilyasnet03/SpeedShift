@@ -107,6 +107,9 @@ public class AdminService {
     public UserSummary setUserRole(Long id, Role role, User actor) {
         User user = userRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("User not found: " + id));
+        if (user.getRole() == Role.AGENCY && role != Role.AGENCY) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Le rôle d'un compte agence ne peut pas être modifié.");
+        }
         if (actor.getId().equals(user.getId()) && role != Role.ADMIN) {
             throw new IllegalArgumentException("An administrator cannot remove their own administrator role");
         }
