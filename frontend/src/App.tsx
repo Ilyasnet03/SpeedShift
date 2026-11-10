@@ -311,7 +311,9 @@ function RequireAuth({ children, adminOnly = false }: { children: ReactNode; adm
 function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleTheme: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuthStore();
-  const isAdminPage = useLocation().pathname === '/admin';
+  const { pathname } = useLocation();
+  const isAdminPage = pathname === '/admin';
+  const isRentalPage = pathname === '/location' || pathname.startsWith('/location/') || pathname === '/agence';
   const t = useT();
   const compareCount = useCompareStore((state) => state.ids.length);
   const { data: unread } = useUnreadCount(Boolean(user), user?.email);
@@ -334,7 +336,7 @@ function Header({ theme, onToggleTheme }: { theme: 'dark' | 'light'; onToggleThe
           <img src={logoSpeedshift} alt="SpeedShift" className="h-9 w-9 rounded-full object-cover sm:h-10 sm:w-10" />
           <div>
             <div className="font-display text-2xl uppercase leading-none text-white sm:text-3xl">SpeedShift</div>
-            <div className="text-[10px] uppercase tracking-[0.32em] text-stone">Marketplace</div>
+            <div className="text-[10px] uppercase tracking-[0.32em] text-stone">{isRentalPage ? t('Location') : 'Marketplace'}</div>
           </div>
         </Link>
 

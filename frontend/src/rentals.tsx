@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useId, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
@@ -31,6 +31,8 @@ function RentalCard({ vehicle }: { vehicle: RentalVehicle }) {
   const [selected, setSelected] = useState(0);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [contactOpen, setContactOpen] = useState(false);
+  const contactId = useId();
   const invalidDates = Boolean(startDate && endDate && startDate > endDate);
   const dates = [
     startDate && `Début souhaité : ${startDate}`,
@@ -57,9 +59,11 @@ function RentalCard({ vehicle }: { vehicle: RentalVehicle }) {
         <a className="rounded-full bg-ember px-2 py-3 text-center text-xs font-medium text-white sm:px-5 sm:text-sm" href={`tel:${vehicle.agency.phone}`}>Appeler l'agence</a>
         <a className="rounded-full border border-white/20 px-2 py-3 text-center text-xs text-white sm:px-5 sm:text-sm" href={`mailto:${vehicle.agency.email}?subject=${encodeURIComponent(`Location : ${vehicle.title}`)}`}>Envoyer un e-mail</a>
       </div>
-      <details className="mt-3 text-xs text-stone sm:text-sm">
-        <summary className="cursor-pointer">Dates souhaitées (facultatif)</summary>
-        <div className="mt-2 grid grid-cols-1 gap-2">
+      {contactUrl ? <>
+        <button type="button" aria-expanded={contactOpen} aria-controls={contactId} onClick={() => setContactOpen((open) => !open)} className="mt-3 block w-full rounded-full bg-[#25D366] px-2 py-3 text-center text-xs font-medium text-white sm:px-5 sm:text-sm">Contacter sur WhatsApp</button>
+        <div id={contactId} hidden={!contactOpen} className="mt-3 text-xs text-stone sm:text-sm">
+          <p>Dates souhaitées (facultatif)</p>
+          <div className="mt-2 grid grid-cols-1 gap-2">
           <label className="block min-w-0">Début
             <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="mt-1 block min-w-0 w-full rounded-lg border border-white/10 bg-[#0d0f10] p-2 text-xs text-white" />
           </label>
@@ -67,10 +71,11 @@ function RentalCard({ vehicle }: { vehicle: RentalVehicle }) {
             <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} className="mt-1 block min-w-0 w-full rounded-lg border border-white/10 bg-[#0d0f10] p-2 text-xs text-white" />
           </label>
           {invalidDates && <p role="alert" className="text-red-400">La date de fin doit suivre la date de début.</p>}
+          </div>
+          {invalidDates ? <p className="mt-2">Corrigez les dates pour continuer.</p> :
+            <a href={contactUrl} target="_blank" rel="noopener noreferrer" className="mt-3 block rounded-full bg-[#25D366] px-2 py-3 text-center text-xs font-medium text-white sm:px-5 sm:text-sm">Ouvrir WhatsApp</a>}
         </div>
-      </details>
-      {contactUrl && !invalidDates ? <a href={contactUrl} target="_blank" rel="noopener noreferrer" className="mt-3 block rounded-full bg-[#25D366] px-2 py-3 text-center text-xs font-medium text-white sm:px-5 sm:text-sm">Contacter sur WhatsApp</a>
-        : <p role="status" className="mt-3 text-xs text-stone">{invalidDates ? 'Corrigez les dates pour contacter l’agence sur WhatsApp.' : 'Numéro WhatsApp indisponible.'}</p>}
+      </> : <p role="status" className="mt-3 text-xs text-stone">Numéro WhatsApp indisponible.</p>}
     </article>
   );
 }
