@@ -289,6 +289,12 @@ html[data-theme='light'] .chat-shell {
   outline-offset: 2px;
 }
 
+.catalog-city-combobox {
+  padding-left: 38px;
+  padding-right: 38px;
+  background-image: none;
+}
+
 .catalog-city-chips {
   display: flex;
   flex-wrap: wrap;

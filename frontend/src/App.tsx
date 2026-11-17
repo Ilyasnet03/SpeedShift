@@ -7,6 +7,7 @@ import {
   Clock,
   Heart,
   SlidersHorizontal,
+  ChevronLeft,
   ChevronRight,
   Gauge,
   Home,
@@ -79,7 +80,6 @@ import { useFavoritesStore } from './store/favoritesStore';
 import { useCompareStore } from './store/compareStore';
 import { useT } from './lib/i18n';
 import { CityCombobox } from './CityCombobox';
-import { MOROCCAN_CITIES } from './lib/moroccoCities';
 import { LoadingIndicator, MutationIndicator } from './LoadingIndicator';
 import { LoadingImage } from './LoadingImage';
 import { whatsappUrl } from './lib/whatsapp';
@@ -789,12 +789,15 @@ function CertifiedBadge() {
 }
 
 const ListingCard = memo(function ListingCard({ listing, compact = false }: { listing: any; compact?: boolean }) {
+  const [activeImage, setActiveImage] = useState(0);
   const userKey = useAuthStore((state) => state.user?.email) ?? 'guest';
   const liked = useFavoritesStore((state) => (state.byUser[userKey] ?? []).includes(listing.id));
   const toggleFavorite = useFavoritesStore((state) => state.toggle);
   const status = String(listing.status ?? '').toLowerCase();
   const isPart = listing.category === 'Pièces & Accessoires';
-  const image = getListingFirstImage(listing.imageUrl);
+  const images = getListingImages(listing.imageUrl);
+  const imageIndex = images.length > 0 ? activeImage % images.length : 0;
+  const image = images[imageIndex];
   const heading = listing.title || [listing.brand, listing.model].filter(Boolean).join(' ');
   const ago = timeAgo(listing.createdAt);
   const chips = [
@@ -815,6 +818,29 @@ const ListingCard = memo(function ListingCard({ listing, compact = false }: { li
       <Link to={`/listing/${listing.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121416] transition duration-300 hover:-translate-y-1 hover:border-ember/40 hover:shadow-soft">
         <div className="relative overflow-hidden">
           {image ? <LoadingImage src={thumbUrl(image)} alt={listing.title} loading="lazy" className={`${compact ? 'aspect-[3/2]' : 'aspect-[4/3]'} w-full ${status === 'sold' ? 'opacity-60' : ''}`} imageClassName={`transition duration-500 group-hover:scale-105 ${status === 'sold' ? 'grayscale' : ''}`} /> : <div className={`${compact ? 'aspect-[3/2]' : 'aspect-[4/3]'} bg-black/20`} />}
+          {images.length > 1 && (
+            <>
+              <button
+                type="button"
+                aria-label={`Photo précédente de ${heading}`}
+                onClick={(event) => { event.preventDefault(); event.stopPropagation(); setActiveImage((index) => (index - 1 + images.length) % images.length); }}
+                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white backdrop-blur transition hover:bg-black/80"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <span className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white" aria-live="polite">
+                {imageIndex + 1} / {images.length}
+              </span>
+              <button
+                type="button"
+                aria-label={`Photo suivante de ${heading}`}
+                onClick={(event) => { event.preventDefault(); event.stopPropagation(); setActiveImage((index) => (index + 1) % images.length); }}
+                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white backdrop-blur transition hover:bg-black/80"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </>
+          )}
           {!compact && (!isPart || status === 'sold' || status === 'reserved') && (
             <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${status === 'sold' ? 'bg-neutral-800' : status === 'reserved' ? 'bg-amber-500' : 'bg-emerald-600'}`}>{status === 'sold' ? 'Vendu' : status === 'reserved' ? 'Réservé' : 'Disponible'}</span>
           )}
@@ -1015,11 +1041,7 @@ function CatalogPage() {
         <div className="space-y-5">
           <div className="catalog-controls">
             <div className="catalog-select-row">
-              <label className="sr-only" htmlFor="catalog-city">Ville</label>
-              <select id="catalog-city" value={city} onChange={(event) => selectCity(event.target.value)} className="catalog-select">
-                <option value="">Toutes les villes</option>
-                {MOROCCAN_CITIES.map((name) => <option key={name} value={name}>{name}</option>)}
-              </select>
+              <CityCombobox value={city} onChange={selectCity} placeholder="Toutes les villes" aria-label="Rechercher une ville" className="catalog-select catalog-city-combobox" />
               <label className="sr-only" htmlFor="catalog-sort">Trier par</label>
               <select id="catalog-sort" value={sort} onChange={(e) => setSort(e.target.value)} className="catalog-select">
                 <option value="featured">À la une</option>

@@ -6,10 +6,11 @@ type CityComboboxProps = {
   value: string;
   onChange: (city: string) => void;
   placeholder?: string;
+  'aria-label'?: string;
   className?: string;
 };
 
-export function CityCombobox({ value, onChange, placeholder = 'Rechercher une ville…', className = '' }: CityComboboxProps) {
+export function CityCombobox({ value, onChange, placeholder = 'Rechercher une ville…', 'aria-label': ariaLabel, className = '' }: CityComboboxProps) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -60,6 +61,7 @@ export function CityCombobox({ value, onChange, placeholder = 'Rechercher une vi
       <input
         type="text"
         role="combobox"
+        aria-label={ariaLabel}
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
