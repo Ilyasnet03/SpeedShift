@@ -987,7 +987,6 @@ function CatalogPage() {
     setSort('newest');
     setSearchParams({});
   };
-  const bannerImage = data.find((item: any) => item.category === 'Voitures' && getListingFirstImage(item.imageUrl));
   const categories = [
     { label: 'Toutes', value: '', icon: <CarFront size={20} aria-hidden="true" /> },
     { label: 'Voitures', value: 'Voitures', icon: <CarFront size={20} aria-hidden="true" /> },
@@ -1001,13 +1000,12 @@ function CatalogPage() {
   return (
     <div className="catalog-page space-y-5">
       <section className="catalog-banner">
-        {bannerImage && <img className="catalog-banner__image" src={thumbUrl(getListingFirstImage(bannerImage.imageUrl)!)} alt="" />}
+        <img className="catalog-banner__image" src={logoSpeedshift} alt="SpeedShift" />
         <div className="catalog-banner__content">
           <h1>{t('Achetez & vendez')}<br /><span>{t('en toute confiance !')}</span></h1>
           <p><ShieldCheck size={15} /> {t('Sécurisé')} <Zap size={15} /> {t('Rapide')}</p>
           <Link to="/safety">{t('Voir plus')} <ChevronRight size={16} /></Link>
         </div>
-        {!bannerImage && <CarFront className="catalog-banner__fallback" size={110} aria-hidden="true" />}
       </section>
       <section className="catalog-search-panel rounded-[26px] border border-white/10 bg-[#121416] p-5">
         <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Recherche</div>
