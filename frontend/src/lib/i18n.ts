@@ -8,6 +8,18 @@ export const LANGS: { code: Lang; label: string }[] = [
 ];
 
 const en: Record<string, string> = {
+  'Toutes': 'All',
+  'Voitures': 'Cars',
+  'Moto': 'Motorcycles',
+  'Jet ski': 'Jet skis',
+  'Quad': 'Quads',
+  'Buggy': 'Buggy',
+  'Pièces': 'Parts',
+  'Achetez & vendez': 'Buy & sell',
+  'en toute confiance !': 'with confidence!',
+  'Sécurisé': 'Secure',
+  'Rapide': 'Fast',
+  'Voir plus': 'Learn more',
   'Vos conversations au même endroit.': 'All your conversations in one place.',
   'Rechercher une conversation': 'Search conversations',
   'Filtrer les conversations': 'Filter conversations',
@@ -126,6 +138,18 @@ const en: Record<string, string> = {
 };
 
 const ar: Record<string, string> = {
+  'Toutes': 'الكل',
+  'Voitures': 'السيارات',
+  'Moto': 'الدراجات',
+  'Jet ski': 'جيت سكي',
+  'Quad': 'الدراجات الرباعية',
+  'Buggy': 'باغي',
+  'Pièces': 'قطع الغيار',
+  'Achetez & vendez': 'اشترِ وبع',
+  'en toute confiance !': 'بكل ثقة!',
+  'Sécurisé': 'آمن',
+  'Rapide': 'سريع',
+  'Voir plus': 'المزيد',
   'Vos conversations au même endroit.': 'كل محادثاتك في مكان واحد.',
   'Rechercher une conversation': 'البحث في المحادثات',
   'Filtrer les conversations': 'تصفية المحادثات',

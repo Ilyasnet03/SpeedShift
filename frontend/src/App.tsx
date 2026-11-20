@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CarFront,
+  CalendarDays,
   Clock,
   Heart,
   SlidersHorizontal,
-  ChevronLeft,
   ChevronRight,
+  Settings,
   Gauge,
   Home,
   MapPin,
@@ -788,6 +789,23 @@ function CertifiedBadge() {
   return <span className="certified-badge inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold"><ShieldCheck size={13} aria-hidden="true" /> Certifié SpeedShift</span>;
 }
 
+function VehicleCategoryIcon({ type }: { type: 'moto' | 'quad' | 'jet' | 'buggy' }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {type === 'jet' ? (
+        <><path d="M3 16h18l-3 3H7l-4-3Zm5 0 4-6h4l3 6M12 10l-2-3h3" /><path d="M3 21h18" /></>
+      ) : (
+        <>
+          <circle cx="6" cy="17" r="3" /><circle cx="18" cy="17" r="3" />
+          {type === 'moto' && <><path d="m6 17 4-6 3 6H6m7 0 3-7h2l-2 7h2M8 10h3m5-2h2" /></>}
+          {type === 'quad' && <><path d="M4 14 6 10h5l2 3h4l3 2M8 14h8m-5-4 2-3h2" /></>}
+          {type === 'buggy' && <><path d="M3 14h18l-2-4h-3l-2-4H9L6 10l-3 4Zm4-4h9M9 6l1 4m4-4 2 4" /></>}
+        </>
+      )}
+    </svg>
+  );
+}
+
 const ListingCard = memo(function ListingCard({ listing, compact = false }: { listing: any; compact?: boolean }) {
   const [activeImage, setActiveImage] = useState(0);
   const userKey = useAuthStore((state) => state.user?.email) ?? 'guest';
@@ -797,7 +815,7 @@ const ListingCard = memo(function ListingCard({ listing, compact = false }: { li
   const isPart = listing.category === 'Pièces & Accessoires';
   const images = getListingImages(listing.imageUrl);
   const imageIndex = images.length > 0 ? activeImage % images.length : 0;
-  const image = images[imageIndex];
+  const dotStart = Math.max(0, Math.min(imageIndex - 3, images.length - 7));
   const heading = listing.title || [listing.brand, listing.model].filter(Boolean).join(' ');
   const ago = timeAgo(listing.createdAt);
   const chips = [
@@ -815,32 +833,40 @@ const ListingCard = memo(function ListingCard({ listing, compact = false }: { li
       transition={{ duration: 0.5, ease: 'easeOut' }}
       className={`h-full${compact ? ' listing-card--compact' : ''}`}
     >
-      <Link to={`/listing/${listing.id}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121416] transition duration-300 hover:-translate-y-1 hover:border-ember/40 hover:shadow-soft">
+      <div className="group flex h-full flex-col overflow-hidden rounded-xl border border-white/10 bg-[#121416] transition duration-300 hover:-translate-y-1 hover:border-ember/40 hover:shadow-soft">
         <div className="relative overflow-hidden">
-          {image ? <LoadingImage src={thumbUrl(image)} alt={listing.title} loading="lazy" className={`${compact ? 'aspect-[3/2]' : 'aspect-[4/3]'} w-full ${status === 'sold' ? 'opacity-60' : ''}`} imageClassName={`transition duration-500 group-hover:scale-105 ${status === 'sold' ? 'grayscale' : ''}`} /> : <div className={`${compact ? 'aspect-[3/2]' : 'aspect-[4/3]'} bg-black/20`} />}
+          {images.length > 0 ? (
+            <div
+              className="listing-gallery"
+              tabIndex={images.length > 1 ? 0 : undefined}
+              role={images.length > 1 ? 'region' : undefined}
+              aria-label={images.length > 1 ? `Photos de ${heading} : ${imageIndex + 1} sur ${images.length}` : undefined}
+              onScroll={(event) => {
+                const container = event.currentTarget;
+                const first = container.firstElementChild;
+                if (first) setActiveImage(Math.min(images.length - 1, Math.round(Math.abs(first.getBoundingClientRect().left - container.getBoundingClientRect().left) / container.clientWidth)));
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                event.preventDefault();
+                event.currentTarget.scrollBy({ left: event.key === 'ArrowRight' ? event.currentTarget.clientWidth : -event.currentTarget.clientWidth, behavior: 'smooth' });
+              }}
+            >
+              {images.map((image, index) => (
+                <Link key={`${image.slice(0, 80)}-${index}`} to={`/listing/${listing.id}`} className="listing-gallery__slide" draggable={false}>
+                  <LoadingImage src={thumbUrl(image)} alt={`${heading} — ${index + 1} / ${images.length}`} loading="lazy" className={`aspect-square w-full ${status === 'sold' ? 'opacity-60' : ''}`} imageClassName={status === 'sold' ? 'grayscale' : ''} />
+                </Link>
+              ))}
+            </div>
+          ) : <Link to={`/listing/${listing.id}`} aria-label={heading} className="block aspect-square bg-black/20" />}
           {images.length > 1 && (
-            <>
-              <button
-                type="button"
-                aria-label={`Photo précédente de ${heading}`}
-                onClick={(event) => { event.preventDefault(); event.stopPropagation(); setActiveImage((index) => (index - 1 + images.length) % images.length); }}
-                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white backdrop-blur transition hover:bg-black/80"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white" aria-live="polite">
-                {imageIndex + 1} / {images.length}
-              </span>
-              <button
-                type="button"
-                aria-label={`Photo suivante de ${heading}`}
-                onClick={(event) => { event.preventDefault(); event.stopPropagation(); setActiveImage((index) => (index + 1) % images.length); }}
-                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white backdrop-blur transition hover:bg-black/80"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </>
+            <div className="listing-gallery__dots" aria-hidden="true">
+              {images.slice(dotStart, dotStart + 7).map((image, index) => (
+                <span key={`${image.slice(0, 80)}-${index + dotStart}`} className={index + dotStart === imageIndex ? 'is-active' : ''} />
+              ))}
+            </div>
           )}
+          {compact && listing.sellerCertified && <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-emerald-700 px-2 py-1 text-[10px] font-semibold text-white"><ShieldCheck size={13} /> Certifié</span>}
           {!compact && (!isPart || status === 'sold' || status === 'reserved') && (
             <span className={`absolute left-3 top-3 rounded-lg px-3 py-1 text-xs font-semibold text-white ${status === 'sold' ? 'bg-neutral-800' : status === 'reserved' ? 'bg-amber-500' : 'bg-emerald-600'}`}>{status === 'sold' ? 'Vendu' : status === 'reserved' ? 'Réservé' : 'Disponible'}</span>
           )}
@@ -848,19 +874,19 @@ const ListingCard = memo(function ListingCard({ listing, compact = false }: { li
             type="button"
             aria-label={liked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
             aria-pressed={liked}
-            onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleFavorite(userKey, listing.id); }}
+            onClick={() => toggleFavorite(userKey, listing.id)}
             className="absolute right-3 top-3 rounded-full bg-black/30 p-2 text-white backdrop-blur transition hover:bg-black/50"
           >
             <Heart size={18} className={liked ? 'fill-red-500 text-red-500' : ''} />
           </button>
         </div>
-        <div className={`flex flex-1 flex-col gap-2 p-3 sm:p-4${compact ? ' listing-card__content' : ''}`}>
+        <Link to={`/listing/${listing.id}`} className={`flex flex-1 flex-col gap-2 p-3 sm:p-4${compact ? ' listing-card__content' : ''}`}>
           <h3 className={`line-clamp-1 font-semibold text-white ${compact ? 'text-sm sm:text-base' : 'text-base sm:text-lg'}`}>{heading}</h3>
-          {listing.sellerCertified && <CertifiedBadge />}
+          {!compact && listing.sellerCertified && <CertifiedBadge />}
           {listing.availability && <AvailabilityBadge value={listing.availability} className="self-start" />}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone/80 sm:text-sm">
-            {listing.city && <span className="inline-flex items-center gap-1">{!compact && <MapPin size={14} />}{listing.city}</span>}
-            {compact && listing.year && <span>• {listing.year}</span>}
+            {compact && listing.year && <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{listing.year}</span>}
+            {listing.city && <span className="inline-flex items-center gap-1"><MapPin size={compact ? 13 : 14} />{listing.city}</span>}
             {!compact && ago && <span className="inline-flex items-center gap-1"><Clock size={14} />{ago}</span>}
           </div>
           <div className={`font-bold text-white ${compact ? 'text-base sm:text-lg' : 'text-xl sm:text-2xl'}`}>{formatPrice(listing.price)}</div>
@@ -869,8 +895,8 @@ const ListingCard = memo(function ListingCard({ listing, compact = false }: { li
               {chips.map((chip) => <span key={chip} className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-stone">{chip}</span>)}
             </div>
           )}
-        </div>
-      </Link>
+        </Link>
+      </div>
     </motion.div>
   );
 });
@@ -890,7 +916,6 @@ function CatalogPage() {
   const emptyFilters = { priceMin: '', priceMax: '', yearMin: '', yearMax: '', mileageMax: '', fuel: '', transmission: '', availability: '' };
   const [filters, setFilters] = useState(emptyFilters);
   const setFilter = (field: keyof typeof emptyFilters, value: string) => setFilters((previous) => ({ ...previous, [field]: value }));
-  const popularCities = ['Casablanca', 'Rabat', 'Marrakech', 'Tanger', 'Fès', 'Agadir'];
   const selectCity = (next: string) => {
     setCity(next);
     setSearchParams((previous) => {
@@ -962,9 +987,28 @@ function CatalogPage() {
     setSort('newest');
     setSearchParams({});
   };
+  const bannerImage = data.find((item: any) => item.category === 'Voitures' && getListingFirstImage(item.imageUrl));
+  const categories = [
+    { label: 'Toutes', value: '', icon: <CarFront size={20} aria-hidden="true" /> },
+    { label: 'Voitures', value: 'Voitures', icon: <CarFront size={20} aria-hidden="true" /> },
+    { label: 'Moto', value: 'Motos', icon: <VehicleCategoryIcon type="moto" /> },
+    { label: 'Quad', value: 'Quads', icon: <VehicleCategoryIcon type="quad" /> },
+    { label: 'Jet ski', value: 'Jet Skis', icon: <VehicleCategoryIcon type="jet" /> },
+    { label: 'Buggy', value: 'Buggys', icon: <VehicleCategoryIcon type="buggy" /> },
+    { label: 'Pièces', value: 'Pièces & Accessoires', icon: <Settings size={20} aria-hidden="true" /> }
+  ];
 
   return (
     <div className="catalog-page space-y-5">
+      <section className="catalog-banner">
+        {bannerImage && <img className="catalog-banner__image" src={thumbUrl(getListingFirstImage(bannerImage.imageUrl)!)} alt="" />}
+        <div className="catalog-banner__content">
+          <h1>{t('Achetez & vendez')}<br /><span>{t('en toute confiance !')}</span></h1>
+          <p><ShieldCheck size={15} /> {t('Sécurisé')} <Zap size={15} /> {t('Rapide')}</p>
+          <Link to="/safety">{t('Voir plus')} <ChevronRight size={16} /></Link>
+        </div>
+        {!bannerImage && <CarFront className="catalog-banner__fallback" size={110} aria-hidden="true" />}
+      </section>
       <section className="catalog-search-panel rounded-[26px] border border-white/10 bg-[#121416] p-5">
         <div className="text-[10px] uppercase tracking-[0.28em] text-ember">Recherche</div>
         <h1 className="mt-1 font-display text-4xl uppercase text-white">Marketplace</h1>
@@ -986,7 +1030,7 @@ function CatalogPage() {
               <span>Catégorie</span>
               <select value={category ?? ''} onChange={(event) => setSearchParams((previous) => { const next = new URLSearchParams(previous); event.target.value ? next.set('category', event.target.value) : next.delete('category'); return next; })} className="w-full rounded-xl border border-white/10 bg-[#0b0c0e] p-3 text-white">
                 <option value="">Toutes</option>
-                {['Motos', 'Voitures', 'Jet Skis', 'Quads', 'Pièces & Accessoires'].map((item) => <option key={item} value={item}>{item}</option>)}
+                {['Motos', 'Voitures', 'Jet Skis', 'Quads', 'Buggys', 'Pièces & Accessoires'].map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </label>
             <div className="space-y-2">
@@ -1051,12 +1095,17 @@ function CatalogPage() {
                 <option value="popular">Populaires</option>
               </select>
             </div>
-            <div className="catalog-city-chips">
-              <button type="button" onClick={() => selectCity('')} className={`rounded-full border px-3 py-1 text-xs transition ${city ? 'border-white/10 text-stone hover:text-white' : 'border-ember bg-ember text-white'}`}>Toutes</button>
-              {popularCities.slice(0, 3).map((name) => (
-                <button key={name} type="button" onClick={() => selectCity(name)} className={`rounded-full border px-3 py-1 text-xs transition ${city === name ? 'border-ember bg-ember text-white' : 'border-white/10 text-stone hover:text-white'}`}>{name}</button>
+            <nav className="catalog-categories" aria-label="Catégories d'annonces">
+              {categories.map(({ label, value, icon }) => (
+                <button key={value} type="button" aria-pressed={(category ?? '') === value} onClick={() => setSearchParams((previous) => {
+                  const next = new URLSearchParams(previous);
+                  if (value) next.set('category', value); else next.delete('category');
+                  return next;
+                })} className={`catalog-category${(category ?? '') === value ? ' is-active' : ''}`}>
+                  {icon} {t(label)}
+                </button>
               ))}
-            </div>
+            </nav>
             <div className="catalog-result-row">
               <span className="text-sm text-stone/80">{filtered.length} annonce{filtered.length > 1 ? 's' : ''}</span>
               <button type="button" onClick={() => setFiltersOpen((open) => !open)} className="inline-flex items-center gap-1 text-sm text-stone hover:text-white" aria-expanded={filtersOpen} aria-controls="catalog-detailed-filters">
@@ -1364,7 +1413,7 @@ function SellPage() {
         </label>
         <label className="space-y-2 text-sm text-stone">Catégorie *
           <select value={form.category} onChange={(event) => updateField('category', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0f10] p-3 text-white">
-            {['Motos', 'Voitures', 'Jet Skis', 'Quads', 'Pièces & Accessoires'].map((category) => <option key={category}>{category}</option>)}
+            {['Motos', 'Voitures', 'Jet Skis', 'Quads', 'Buggys', 'Pièces & Accessoires'].map((category) => <option key={category}>{category}</option>)}
           </select>
         </label>
         {form.category === PARTS_CATEGORY && (

@@ -15,7 +15,7 @@ public class ListingDtos {
 
     public record CreateListingRequest(
         @NotBlank @Size(max = 255) String title,
-        @NotBlank @Pattern(regexp = "Motos|Voitures|Jet Skis|Quads|Pièces & Accessoires") String category,
+        @NotBlank @Pattern(regexp = "Motos|Voitures|Jet Skis|Quads|Buggys|Pièces & Accessoires") String category,
         @Size(max = 100) String subcategory,
         @Size(max = 100) String brand,
         @Size(max = 100) String model,
